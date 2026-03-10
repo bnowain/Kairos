@@ -201,6 +201,18 @@ class HighlightSegmentOut(BaseModel):
     clip_id:                  Optional[str] = None   # set if clip already created
 
 
+class ClipCreate(BaseModel):
+    item_id: str
+    start_ms: int
+    end_ms: int
+    clip_title: Optional[str] = None
+    remove_silence: bool = False
+
+
+class ClipUpdate(BaseModel):
+    clip_title: Optional[str] = None
+
+
 class ClipOut(BaseModel):
     clip_id:         str
     item_id:         str
@@ -215,6 +227,7 @@ class ClipOut(BaseModel):
     clip_source:     str
     speaker_label:   Optional[str] = None
     clip_transcript: Optional[str] = None
+    error_msg:       Optional[str] = None
     created_at:      str
     updated_at:      str
 

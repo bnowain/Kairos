@@ -648,14 +648,194 @@ def analysis_task(item_id: str):
             item_id, len(scored_segments), len(clip_rows),
         )
 
-        # ── Step 9: Note for Phase 4 ──────────────────────────────────────────
+        # ── Step 9: Enqueue extraction for auto-created clips (Phase 4) ──────
         if clip_rows:
+            from kairos.tasks import extract_clip_task as _extract_clip_task
+            for clip_row in clip_rows:
+                _extract_clip_task(clip_row.clip_id)
             logger.info(
-                "analysis_task: clip extraction task will be added in Phase 4 (%d clips pending)",
+                "analysis_task: enqueued extract_clip_task for %d auto-created clip(s)",
                 len(clip_rows),
             )
 
     except Exception as exc:
         logger.exception("analysis_task: unexpected error for item %s", item_id)
+    finally:
+        db.close()
+
+
+# ── Phase 4: Clip extraction tasks ────────────────────────────────────────────
+
+@huey_light.task()
+def extract_clip_task(clip_id: str, remove_silence: bool = False):
+    """
+    Extract a single clip to disk.
+
+    Pipeline:
+    1. Load Clip from DB, verify item exists and has file_path
+    2. Set clip_status = "extracting"
+    3. Build output path: media/clips/{item_id}/{clip_id}.mp4
+    4. Call extractor.extract_clip(source_path, output_path, start_ms, end_ms)
+    5. If remove_silence=True: call silence_remover.remove_silence(output, silenced_output)
+    6. Generate thumbnail at media/thumbs/clips/{clip_id}.jpg
+    7. Update clip: clip_file_path, clip_thumb_path, clip_status="ready", duration_ms
+    8. On error: clip_status="error", error_msg=str(exc)
+    """
+    from kairos.database import SessionLocal
+    from kairos.models import Clip, MediaItem
+    from kairos.config import BASE_DIR
+    from kairos.services.clip_engine import extractor, silence_remover
+
+    db = SessionLocal()
+    try:
+        clip = db.query(Clip).filter(Clip.clip_id == clip_id).first()
+        if not clip:
+            logger.error("extract_clip_task: clip_id %s not found", clip_id)
+            return
+
+        item = db.query(MediaItem).filter(MediaItem.item_id == clip.item_id).first()
+        if not item:
+            logger.error(
+                "extract_clip_task: MediaItem %s not found for clip %s",
+                clip.item_id, clip_id,
+            )
+            clip.clip_status = "error"
+            clip.error_msg   = f"MediaItem {clip.item_id} not found"
+            clip.updated_at  = _now()
+            db.commit()
+            return
+
+        if not item.file_path:
+            logger.error(
+                "extract_clip_task: MediaItem %s has no file_path (clip %s)",
+                item.item_id, clip_id,
+            )
+            clip.clip_status = "error"
+            clip.error_msg   = "MediaItem has no file_path"
+            clip.updated_at  = _now()
+            db.commit()
+            return
+
+        # Mark as extracting
+        clip.clip_status = "extracting"
+        clip.updated_at  = _now()
+        db.commit()
+
+        source_path = str(BASE_DIR / item.file_path)
+
+        # Output: media/clips/{item_id}/{clip_id}.mp4  (relative to BASE_DIR)
+        rel_clip_path   = f"media/clips/{item.item_id}/{clip_id}.mp4"
+        abs_clip_path   = str(BASE_DIR / rel_clip_path)
+
+        logger.info(
+            "extract_clip_task: extracting clip %s  [%dms – %dms]  source=%s",
+            clip_id, clip.start_ms, clip.end_ms, source_path,
+        )
+
+        extract_result = extractor.extract_clip(
+            source_path=source_path,
+            output_path=abs_clip_path,
+            start_ms=clip.start_ms,
+            end_ms=clip.end_ms,
+        )
+
+        if not extract_result["success"]:
+            raise RuntimeError(extract_result["error"] or "extract_clip returned failure")
+
+        final_clip_path     = abs_clip_path
+        final_rel_clip_path = rel_clip_path
+
+        # Silence removal (optional)
+        if remove_silence:
+            silenced_rel  = f"media/clips/{item.item_id}/{clip_id}_silenced.mp4"
+            silenced_abs  = str(BASE_DIR / silenced_rel)
+            sr_result     = silence_remover.remove_silence(
+                input_path=abs_clip_path,
+                output_path=silenced_abs,
+            )
+            if sr_result["success"] and sr_result["silence_removed_ms"] > 0:
+                # Replace the original clip with the silence-removed version
+                try:
+                    import os
+                    os.replace(silenced_abs, abs_clip_path)
+                    logger.info(
+                        "extract_clip_task: silence removal saved %dms for clip %s",
+                        sr_result["silence_removed_ms"], clip_id,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "extract_clip_task: could not replace clip with silenced version: %s", exc
+                    )
+            else:
+                # Clean up unused silenced file if it was created
+                try:
+                    from pathlib import Path as _Path
+                    _Path(silenced_abs).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+        # Refresh actual duration from disk
+        from kairos.services.clip_engine.extractor import _get_clip_duration_ms
+        duration_ms = _get_clip_duration_ms(final_clip_path)
+        if duration_ms <= 0:
+            duration_ms = clip.end_ms - clip.start_ms
+
+        # Thumbnail: media/thumbs/clips/{clip_id}.jpg  (relative to BASE_DIR)
+        rel_thumb_path = f"media/thumbs/clips/{clip_id}.jpg"
+        abs_thumb_path = str(BASE_DIR / rel_thumb_path)
+
+        thumb_ok = extractor.generate_clip_thumbnail(
+            clip_path=final_clip_path,
+            thumb_path=abs_thumb_path,
+        )
+
+        # Persist results
+        clip.clip_file_path  = final_rel_clip_path
+        clip.clip_thumb_path = rel_thumb_path if thumb_ok else None
+        clip.duration_ms     = duration_ms
+        clip.clip_status     = "ready"
+        clip.error_msg       = None
+        clip.updated_at      = _now()
+        db.commit()
+
+        logger.info(
+            "extract_clip_task: completed for clip %s — duration=%dms  thumb=%s",
+            clip_id, duration_ms, "yes" if thumb_ok else "no",
+        )
+
+    except Exception as exc:
+        logger.exception("extract_clip_task: unexpected error for clip %s", clip_id)
+        try:
+            clip = db.query(Clip).filter(Clip.clip_id == clip_id).first()
+            if clip:
+                clip.clip_status = "error"
+                clip.error_msg   = str(exc)[:1000]
+                clip.updated_at  = _now()
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+@huey_light.task()
+def batch_extract_task(item_id: str = None):
+    """
+    Enqueue extract_clip_task for all pending clips.
+    If item_id is provided, only for that item.
+    """
+    from kairos.database import SessionLocal
+    from kairos.services.clip_engine.batch_clipper import enqueue_pending_clips
+
+    db = SessionLocal()
+    try:
+        count = enqueue_pending_clips(db, item_id=item_id)
+        logger.info(
+            "batch_extract_task: enqueued %d clip extraction task(s)%s",
+            count,
+            f" for item {item_id}" if item_id else "",
+        )
+    except Exception as exc:
+        logger.exception("batch_extract_task: unexpected error")
     finally:
         db.close()
