@@ -1,0 +1,71 @@
+{
+  "template_id": "podcast_highlights",
+  "template_name": "Podcast Highlights",
+  "description": "Best moments from a long-form podcast or interview. Prioritises quotable insights, surprising revelations, and emotionally resonant exchanges.",
+  "slots": [
+    {
+      "slot_id": "teaser",
+      "slot_label": "Teaser / Best Quote",
+      "position": 0,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["virality", "hook"],
+      "max_duration_ms": 20000,
+      "notes": "The single most quotable or surprising moment — used as the hook"
+    },
+    {
+      "slot_id": "intro_context",
+      "slot_label": "Episode Context",
+      "position": 1,
+      "required": false,
+      "max_clips": 1,
+      "score_signals": ["hook"],
+      "max_duration_ms": 15000,
+      "notes": "Optional: who is the guest, what is the episode about"
+    },
+    {
+      "slot_id": "insight_1",
+      "slot_label": "Key Insight 1",
+      "position": 2,
+      "required": true,
+      "max_clips": 3,
+      "score_signals": ["emotional", "qa"],
+      "max_duration_ms": 60000,
+      "notes": "First major insight or argument from the episode"
+    },
+    {
+      "slot_id": "insight_2",
+      "slot_label": "Key Insight 2",
+      "position": 3,
+      "required": false,
+      "max_clips": 3,
+      "score_signals": ["virality", "emotional"],
+      "max_duration_ms": 60000,
+      "notes": "Second major insight — can be a contrasting perspective or revelation"
+    },
+    {
+      "slot_id": "memorable_exchange",
+      "slot_label": "Memorable Exchange",
+      "position": 4,
+      "required": false,
+      "max_clips": 3,
+      "score_signals": ["audience_reaction", "controversy"],
+      "max_duration_ms": 45000,
+      "notes": "Back-and-forth that generated the most engagement or surprised the host"
+    },
+    {
+      "slot_id": "closing_takeaway",
+      "slot_label": "Closing Takeaway",
+      "position": 5,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["emotional", "hook"],
+      "max_duration_ms": 20000,
+      "notes": "Final thought or call to listen to the full episode"
+    }
+  ],
+  "pacing": "slow",
+  "target_duration_ms": 180000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "16:9"
+}

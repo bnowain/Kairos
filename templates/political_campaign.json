@@ -1,0 +1,61 @@
+{
+  "template_id": "political_campaign",
+  "template_name": "Political Campaign",
+  "description": "Structured narrative for candidate or issue advocacy. Opens with the problem, presents the candidate's position, closes with a clear call to action.",
+  "slots": [
+    {
+      "slot_id": "problem_hook",
+      "slot_label": "Problem / Issue Hook",
+      "position": 0,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["emotional", "controversy"],
+      "max_duration_ms": 30000,
+      "notes": "Establish the issue — ideally with a constituent voice or news clip"
+    },
+    {
+      "slot_id": "candidate_statement",
+      "slot_label": "Candidate Statement",
+      "position": 1,
+      "required": true,
+      "max_clips": 3,
+      "score_signals": ["virality", "hook"],
+      "max_duration_ms": 45000,
+      "notes": "Candidate speaks directly to the issue — strongest quote first"
+    },
+    {
+      "slot_id": "evidence_support",
+      "slot_label": "Evidence / Support",
+      "position": 2,
+      "required": false,
+      "max_clips": 3,
+      "score_signals": ["qa"],
+      "max_duration_ms": 30000,
+      "notes": "Data, testimonials, or expert backing for the candidate's position"
+    },
+    {
+      "slot_id": "contrast",
+      "slot_label": "Contrast / Opponent Clip",
+      "position": 3,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["controversy"],
+      "max_duration_ms": 20000,
+      "notes": "Optional contrast with opponent's contradictory statement"
+    },
+    {
+      "slot_id": "close_cta",
+      "slot_label": "Close / Call to Action",
+      "position": 4,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["hook", "emotional"],
+      "max_duration_ms": 15000,
+      "notes": "Final ask — vote, donate, sign up. Can be a title card."
+    }
+  ],
+  "pacing": "moderate",
+  "target_duration_ms": 120000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "16:9"
+}

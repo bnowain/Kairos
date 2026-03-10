@@ -1,0 +1,71 @@
+{
+  "template_id": "commentary_mashup",
+  "template_name": "Commentary Mashup",
+  "description": "Interleaves primary source clips with commentary or reaction clips. Ideal for analysis videos that react to news footage or social media content.",
+  "slots": [
+    {
+      "slot_id": "intro_commentary",
+      "slot_label": "Intro Commentary",
+      "position": 0,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["hook", "virality"],
+      "max_duration_ms": 30000,
+      "notes": "Commentator frames the topic and tells the audience what they're about to see"
+    },
+    {
+      "slot_id": "source_clip_1",
+      "slot_label": "Source Clip 1",
+      "position": 1,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["controversy", "emotional"],
+      "max_duration_ms": 45000,
+      "notes": "First primary source clip being reacted to"
+    },
+    {
+      "slot_id": "reaction_1",
+      "slot_label": "Reaction / Analysis 1",
+      "position": 2,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["virality", "audience_reaction"],
+      "max_duration_ms": 30000,
+      "notes": "Commentary or reaction to source clip 1"
+    },
+    {
+      "slot_id": "source_clip_2",
+      "slot_label": "Source Clip 2",
+      "position": 3,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["controversy", "emotional"],
+      "max_duration_ms": 45000,
+      "notes": "Second primary source clip"
+    },
+    {
+      "slot_id": "reaction_2",
+      "slot_label": "Reaction / Analysis 2",
+      "position": 4,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["virality"],
+      "max_duration_ms": 30000,
+      "notes": "Commentary on source clip 2"
+    },
+    {
+      "slot_id": "wrap_up",
+      "slot_label": "Wrap-Up / Conclusion",
+      "position": 5,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["hook"],
+      "max_duration_ms": 20000,
+      "notes": "Commentator's takeaway or final verdict"
+    }
+  ],
+  "pacing": "moderate",
+  "target_duration_ms": 300000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "16:9"
+}

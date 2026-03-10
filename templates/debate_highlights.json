@@ -1,0 +1,61 @@
+{
+  "template_id": "debate_highlights",
+  "template_name": "Debate Highlights",
+  "description": "The best exchanges and one-liners from a debate or structured argument. Preserves the back-and-forth rhythm — question, answer, rebuttal.",
+  "slots": [
+    {
+      "slot_id": "opening_clash",
+      "slot_label": "Opening Clash",
+      "position": 0,
+      "required": true,
+      "max_clips": 3,
+      "score_signals": ["controversy", "virality"],
+      "max_duration_ms": 45000,
+      "notes": "First major clash or memorable opening statement — sets the stakes"
+    },
+    {
+      "slot_id": "exchange_1",
+      "slot_label": "Key Exchange 1",
+      "position": 1,
+      "required": true,
+      "max_clips": 4,
+      "score_signals": ["controversy", "audience_reaction"],
+      "max_duration_ms": 60000,
+      "notes": "First major back-and-forth. Include both speakers."
+    },
+    {
+      "slot_id": "one_liner",
+      "slot_label": "Memorable One-Liner",
+      "position": 2,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["virality", "hook"],
+      "max_duration_ms": 20000,
+      "notes": "The clip that will be screenshotted and shared"
+    },
+    {
+      "slot_id": "exchange_2",
+      "slot_label": "Key Exchange 2",
+      "position": 3,
+      "required": false,
+      "max_clips": 4,
+      "score_signals": ["controversy", "emotional"],
+      "max_duration_ms": 60000,
+      "notes": "Second major exchange or gotcha moment"
+    },
+    {
+      "slot_id": "closing_moment",
+      "slot_label": "Closing Moment",
+      "position": 4,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["emotional", "virality"],
+      "max_duration_ms": 30000,
+      "notes": "Closing statement or final memorable exchange"
+    }
+  ],
+  "pacing": "moderate",
+  "target_duration_ms": 180000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "16:9"
+}

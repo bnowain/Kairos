@@ -1,0 +1,6 @@
+# Whisper vocabulary hints for Kairos
+# Add proper nouns, names, and domain-specific terms that Whisper struggles with.
+# These are prepended as the initial_prompt to improve transcription accuracy.
+#
+# Format: one term per line under "terms:"
+terms: []

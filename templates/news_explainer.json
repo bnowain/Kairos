@@ -1,0 +1,61 @@
+{
+  "template_id": "news_explainer",
+  "template_name": "News Explainer",
+  "description": "Journalistic structure: What happened → Who's involved → Why it matters → What comes next. Suitable for investigative or accountability reporting.",
+  "slots": [
+    {
+      "slot_id": "lede",
+      "slot_label": "Lede — What Happened",
+      "position": 0,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["virality", "hook"],
+      "max_duration_ms": 30000,
+      "notes": "The most newsworthy moment — most important information first"
+    },
+    {
+      "slot_id": "who",
+      "slot_label": "Who's Involved",
+      "position": 1,
+      "required": true,
+      "max_clips": 3,
+      "score_signals": ["emotional", "qa"],
+      "max_duration_ms": 45000,
+      "notes": "Key players speak — officials, witnesses, or affected parties"
+    },
+    {
+      "slot_id": "context",
+      "slot_label": "Context / Background",
+      "position": 2,
+      "required": false,
+      "max_clips": 3,
+      "score_signals": ["qa"],
+      "max_duration_ms": 45000,
+      "notes": "Historical context or prior statements that are relevant to the story"
+    },
+    {
+      "slot_id": "significance",
+      "slot_label": "Why It Matters",
+      "position": 3,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["emotional", "controversy"],
+      "max_duration_ms": 30000,
+      "notes": "Impact on the community or policy implications"
+    },
+    {
+      "slot_id": "whats_next",
+      "slot_label": "What Comes Next",
+      "position": 4,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["hook"],
+      "max_duration_ms": 20000,
+      "notes": "Upcoming votes, hearings, deadlines — future stakes"
+    }
+  ],
+  "pacing": "slow",
+  "target_duration_ms": 240000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "16:9"
+}

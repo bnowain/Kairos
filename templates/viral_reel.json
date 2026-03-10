@@ -1,0 +1,61 @@
+{
+  "template_id": "viral_reel",
+  "template_name": "Viral Reel",
+  "description": "Strongest moments first, fast pacing, high emotional content. Designed for short-form platforms (TikTok, Instagram Reels, YouTube Shorts).",
+  "slots": [
+    {
+      "slot_id": "hook",
+      "slot_label": "Hook",
+      "position": 0,
+      "required": true,
+      "max_clips": 1,
+      "score_signals": ["virality", "emotional", "hook"],
+      "max_duration_ms": 15000,
+      "notes": "First 3 seconds must grab attention — use highest-virality clip"
+    },
+    {
+      "slot_id": "peak_1",
+      "slot_label": "Peak Moment 1",
+      "position": 1,
+      "required": true,
+      "max_clips": 2,
+      "score_signals": ["virality", "controversy"],
+      "max_duration_ms": 20000,
+      "notes": "The strongest confrontation or reveal"
+    },
+    {
+      "slot_id": "build",
+      "slot_label": "Build / Context",
+      "position": 2,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["emotional"],
+      "max_duration_ms": 15000,
+      "notes": "Optional brief context that amplifies the payoff"
+    },
+    {
+      "slot_id": "peak_2",
+      "slot_label": "Peak Moment 2",
+      "position": 3,
+      "required": false,
+      "max_clips": 2,
+      "score_signals": ["virality", "emotional"],
+      "max_duration_ms": 20000,
+      "notes": "Second high point — can be a reaction or callback"
+    },
+    {
+      "slot_id": "cta",
+      "slot_label": "Call to Action",
+      "position": 4,
+      "required": false,
+      "max_clips": 1,
+      "score_signals": ["hook"],
+      "max_duration_ms": 5000,
+      "notes": "Optional CTA card or final sound bite"
+    }
+  ],
+  "pacing": "fast",
+  "target_duration_ms": 60000,
+  "transition_default": "cut",
+  "aspect_ratio_default": "9:16"
+}
