@@ -839,3 +839,90 @@ def batch_extract_task(item_id: str = None):
         logger.exception("batch_extract_task: unexpected error")
     finally:
         db.close()
+
+
+# ── Phase 5: Story Builder tasks ───────────────────────────────────────────────
+
+@huey_light.task()
+def build_story_task(
+    item_ids: list,
+    template_id: str,
+    name: str,
+    aspect_ratio: str = "16:9",
+    pacing: str = None,
+    min_score: float = 0.5,
+    project_id: str = None,
+):
+    """
+    Async story builder task — same pipeline as POST /api/stories/generate
+    but for large clip pools that might be slow to assemble.
+    Returns timeline_id when done.
+    """
+    from kairos.database import SessionLocal
+    from kairos.services.story_builder import (
+        clip_ranker, slot_assigner, flow_enforcer, timeline_builder
+    )
+    from kairos.services.story_builder.template_loader import load_template
+
+    db = SessionLocal()
+    try:
+        logger.info(
+            "build_story_task: building story '%s' from %d item(s), template='%s'",
+            name, len(item_ids), template_id,
+        )
+
+        # Load template
+        template = load_template(template_id)
+
+        # Load all ready clips with scores
+        clips = clip_ranker.load_clips_with_scores(db, item_ids=item_ids)
+        logger.info("build_story_task: loaded %d ready clips", len(clips))
+
+        # Filter by min_score
+        if min_score > 0:
+            clips = [
+                c for c in clips
+                if (c.get("scores", {}).get("composite", 0.0) or 0.0) >= min_score
+                or (c.get("virality_score", 0.0) or 0.0) >= min_score
+            ]
+            logger.info(
+                "build_story_task: %d clips pass min_score=%.2f", len(clips), min_score
+            )
+
+        # Assign slots
+        assignment = slot_assigner.assign_slots(
+            template=template,
+            clips=clips,
+            pacing_override=pacing,
+        )
+
+        # Enforce flow
+        elements = flow_enforcer.enforce_flow(
+            slot_assignments=assignment["slot_assignments"],
+            template=template,
+            pacing=pacing,
+        )
+
+        # Build and persist timeline
+        result = timeline_builder.build_timeline(
+            db=db,
+            name=name,
+            template_id=template_id,
+            elements=elements,
+            aspect_ratio=aspect_ratio,
+            project_id=project_id,
+        )
+
+        logger.info(
+            "build_story_task: created timeline %s — %d elements, %dms",
+            result["timeline_id"],
+            result["element_count"],
+            result["target_duration_ms"] or 0,
+        )
+        return result["timeline_id"]
+
+    except Exception as exc:
+        logger.exception("build_story_task: unexpected error for story '%s'", name)
+        raise
+    finally:
+        db.close()

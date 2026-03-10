@@ -232,3 +232,54 @@ class ClipOut(BaseModel):
     updated_at:      str
 
     model_config = {"from_attributes": True}
+
+
+# ── Story Builder / Timelines (Phase 5) ───────────────────────────────────────
+
+class TimelineElementOut(BaseModel):
+    element_id:     str
+    timeline_id:    str
+    element_type:   str
+    position:       int
+    start_ms:       int
+    duration_ms:    int
+    clip_id:        Optional[str] = None
+    element_params: Optional[str] = None   # JSON string
+    created_at:     str
+
+    model_config = {"from_attributes": True}
+
+
+class TimelineOut(BaseModel):
+    timeline_id:        str
+    project_id:         Optional[str] = None
+    timeline_name:      str
+    story_template:     Optional[str] = None
+    aspect_ratio:       str
+    target_duration_ms: Optional[int] = None
+    timeline_status:    str
+    element_count:      int = 0
+    clip_count:         int = 0
+    elements:           list[TimelineElementOut] = []
+    created_at:         str
+    updated_at:         str
+
+    model_config = {"from_attributes": True}
+
+
+class TimelineElementCreate(BaseModel):
+    element_type:   str              # clip | transition | title_card | overlay
+    position:       int
+    duration_ms:    int
+    clip_id:        Optional[str] = None
+    element_params: Optional[str] = None  # JSON string
+
+
+class StoryGenerateRequest(BaseModel):
+    item_ids:     list[str]
+    template_id:  str
+    name:         str
+    aspect_ratio: str = "16:9"
+    pacing:       Optional[str] = None
+    min_score:    float = 0.5
+    project_id:   Optional[str] = None
