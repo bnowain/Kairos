@@ -21,3 +21,11 @@ pyannote.audio>=3.3.0
 torch>=2.3.0
 torchaudio>=2.3.0
 pyyaml>=6.0.0
+
+# Phase 3 — Analysis
+ollama>=0.4.0
+sentence-transformers>=3.0.0
+librosa>=0.11.0
+soundfile>=0.12.0
+numpy>=1.26.0
+scikit-learn>=1.4.0

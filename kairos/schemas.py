@@ -166,3 +166,56 @@ class TranscriptionSegmentOut(BaseModel):
     no_speech_prob:  Optional[float] = None
 
     model_config = {"from_attributes": True}
+
+
+# ── Analysis (Phase 3) ────────────────────────────────────────────────────────
+
+class AnalysisScoreOut(BaseModel):
+    score_id:     str
+    item_id:      str
+    segment_id:   Optional[str] = None
+    score_type:   str
+    score_value:  float
+    score_reason: Optional[str] = None
+    scorer_model: Optional[str] = None
+    created_at:   str
+
+    model_config = {"from_attributes": True}
+
+
+class HighlightSegmentOut(BaseModel):
+    """A scored segment ready for clip creation."""
+    segment_id:               str
+    item_id:                  str
+    speaker_label:            Optional[str] = None
+    start_ms:                 int
+    end_ms:                   int
+    segment_text:             str
+    composite_virality_score: float
+    llm_virality_score:       Optional[float] = None
+    hook_score:               Optional[float] = None
+    emotional_score:          Optional[float] = None
+    controversy_score:        Optional[float] = None
+    highlight_reason:         Optional[str] = None
+    is_hook_candidate:        bool = False
+    clip_id:                  Optional[str] = None   # set if clip already created
+
+
+class ClipOut(BaseModel):
+    clip_id:         str
+    item_id:         str
+    clip_title:      Optional[str] = None
+    start_ms:        int
+    end_ms:          int
+    duration_ms:     int
+    clip_file_path:  Optional[str] = None
+    clip_thumb_path: Optional[str] = None
+    virality_score:  Optional[float] = None
+    clip_status:     str
+    clip_source:     str
+    speaker_label:   Optional[str] = None
+    clip_transcript: Optional[str] = None
+    created_at:      str
+    updated_at:      str
+
+    model_config = {"from_attributes": True}

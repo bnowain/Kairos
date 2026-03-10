@@ -1,11 +1,15 @@
 """
-Huey task definitions for Kairos Phase 1.
+Huey task definitions for Kairos.
 
-Phase 1 tasks (acquisition + ingest only):
+Phase 1 tasks (acquisition + ingest):
   download_task  — runs in huey_light — calls downloader service, updates item status
   ingest_task    — runs in huey_light — extracts audio, generates thumbnail, updates status
 
-GPU tasks (Phase 2+) will be added to huey_gpu.
+Phase 2 tasks (GPU):
+  transcribe_task — runs in huey_gpu — Whisper + diarization + alignment
+
+Phase 3 tasks (GPU):
+  analysis_task   — runs in huey_gpu — LLM + embedder + audio events + scoring
 """
 
 import logging
@@ -350,5 +354,308 @@ def ingest_task(item_id: str):
                 db.commit()
         except Exception:
             pass
+    finally:
+        db.close()
+
+
+@huey_gpu.task()
+def analysis_task(item_id: str):
+    """
+    Full analysis pipeline for one MediaItem (Phase 3).
+
+    Pipeline:
+    1.  Load all TranscriptionSegments for item (must have segments)
+    2.  Run heuristic scorers (emotion + controversy) — fast, no GPU
+    3.  Run embedder for topic segmentation (GPU if available)
+    4.  Load audio_path and run audio_events detection (librosa, CPU)
+    5.  Run LLM analyzer via Ollama (batched)
+    6.  Run scorer.compute_composite_scores()
+    7.  Write AnalysisScore rows to DB (one per segment per score_type)
+    8.  Auto-create Clip rows for segments above AUTO_CLIP_THRESHOLD
+    9.  Log summary: N segments scored, M clips auto-created
+    """
+    import json
+    import uuid as _uuid
+
+    from kairos.database import SessionLocal
+    from kairos.models import AnalysisScore, Clip, MediaItem, TranscriptionSegment
+    from kairos.config import BASE_DIR
+    from kairos.services.analysis import (
+        audio_events,
+        controversy,
+        embedder,
+        emotion_scorer,
+        llm_analyzer,
+        scorer,
+    )
+    from kairos.services.analysis.scorer import AUTO_CLIP_THRESHOLD
+
+    db = SessionLocal()
+    try:
+        # ── Step 1: Load item + segments ──────────────────────────────────────
+        item = db.query(MediaItem).filter(MediaItem.item_id == item_id).first()
+        if not item:
+            logger.error("analysis_task: item_id %s not found", item_id)
+            return
+
+        raw_segments = (
+            db.query(TranscriptionSegment)
+            .filter(TranscriptionSegment.item_id == item_id)
+            .order_by(TranscriptionSegment.start_ms)
+            .all()
+        )
+        if not raw_segments:
+            logger.error("analysis_task: item %s has no transcription segments", item_id)
+            return
+
+        # Convert ORM rows to dicts for the analysis pipeline
+        segments = [
+            {
+                "segment_id":   s.segment_id,
+                "item_id":      s.item_id,
+                "speaker_label": s.speaker_label,
+                "start_ms":     s.start_ms,
+                "end_ms":       s.end_ms,
+                "segment_text": s.segment_text,
+            }
+            for s in raw_segments
+        ]
+        logger.info("analysis_task: loaded %d segments for item %s", len(segments), item_id)
+
+        # ── Step 2: Heuristic scorers (fast, CPU, no deps) ────────────────────
+        segments = emotion_scorer.score_emotion(segments)
+        segments = controversy.score_controversy(segments)
+        logger.info("analysis_task: heuristic scoring complete for item %s", item_id)
+
+        # ── Step 3: Embedder (GPU if available) ───────────────────────────────
+        try:
+            segments = embedder.score_topic_coherence(segments)
+            logger.info("analysis_task: topic coherence scoring complete for item %s", item_id)
+        except Exception as exc:
+            logger.warning(
+                "analysis_task: embedder failed (%s) — defaulting topic_coherence to 0.5", exc
+            )
+            for seg in segments:
+                seg.setdefault("topic_coherence_score", 0.5)
+
+        # ── Step 4: Audio events (librosa, CPU) ───────────────────────────────
+        reaction_events: list[dict] = []
+        if item.audio_path:
+            audio_path_abs = str(BASE_DIR / item.audio_path)
+            try:
+                reaction_events = audio_events.detect_reactions(audio_path_abs)
+                segments = audio_events.score_segments_by_reactions(segments, reaction_events)
+                logger.info(
+                    "analysis_task: audio events: %d reactions for item %s",
+                    len(reaction_events), item_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "analysis_task: audio_events failed (%s) — defaulting audience_reaction to 0.0",
+                    exc,
+                )
+                for seg in segments:
+                    seg.setdefault("audience_reaction_score", 0.0)
+        else:
+            logger.warning(
+                "analysis_task: item %s has no audio_path — skipping audio event detection",
+                item_id,
+            )
+            for seg in segments:
+                seg.setdefault("audience_reaction_score", 0.0)
+
+        # ── Step 5: LLM analysis via Ollama ───────────────────────────────────
+        llm_scores: list[dict] = []
+        try:
+            llm_scores = llm_analyzer.analyze_segments(
+                segments, item_title=item.item_title or ""
+            )
+            logger.info("analysis_task: LLM scoring complete for item %s", item_id)
+        except Exception as exc:
+            logger.warning(
+                "analysis_task: LLM analyzer failed (%s) — using default scores", exc
+            )
+            llm_scores = [
+                {
+                    "segment_id":        seg["segment_id"],
+                    "virality_score":    0.0,
+                    "hook_score":        0.0,
+                    "emotional_score":   0.0,
+                    "controversy_score": 0.0,
+                    "highlight_reason":  "",
+                    "is_hook_candidate": False,
+                }
+                for seg in segments
+            ]
+
+        # ── Step 6: Composite score aggregation ───────────────────────────────
+        scored_segments = scorer.compute_composite_scores(
+            segments=segments,
+            llm_scores=llm_scores,
+            reaction_scores=[],   # already embedded in segment dicts
+            emotion_scores=[],    # already embedded in segment dicts
+            controversy_scores=[], # already embedded in segment dicts
+            embedding_scores=[],  # already embedded in segment dicts
+        )
+        logger.info(
+            "analysis_task: composite scoring complete — %d segments for item %s",
+            len(scored_segments), item_id,
+        )
+
+        # ── Step 7: Write AnalysisScore rows to DB ────────────────────────────
+        # Delete any existing scores for this item first (re-analysis support)
+        db.query(AnalysisScore).filter(AnalysisScore.item_id == item_id).delete(
+            synchronize_session=False
+        )
+        db.commit()
+
+        now_ts = _now()
+        from kairos.config import OLLAMA_MODEL
+
+        score_rows = []
+
+        # Build segment_id → llm_score map
+        llm_map = {s.get("segment_id", ""): s for s in llm_scores}
+
+        for seg in scored_segments:
+            seg_id = seg["segment_id"]
+            llm = llm_map.get(seg_id, {})
+
+            # virality (LLM)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "virality",
+                score_value  = float(llm.get("virality_score", 0.0)),
+                score_reason = llm.get("highlight_reason", ""),
+                scorer_model = OLLAMA_MODEL,
+                created_at   = now_ts,
+            ))
+
+            # hook (LLM)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "hook",
+                score_value  = float(llm.get("hook_score", 0.0)),
+                score_reason = None,
+                scorer_model = OLLAMA_MODEL,
+                created_at   = now_ts,
+            ))
+
+            # emotional (LLM)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "emotional",
+                score_value  = float(llm.get("emotional_score", 0.0)),
+                score_reason = None,
+                scorer_model = OLLAMA_MODEL,
+                created_at   = now_ts,
+            ))
+
+            # controversy (LLM)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "controversy",
+                score_value  = float(llm.get("controversy_score", 0.0)),
+                score_reason = None,
+                scorer_model = OLLAMA_MODEL,
+                created_at   = now_ts,
+            ))
+
+            # audience_reaction (audio events)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "audience_reaction",
+                score_value  = float(seg.get("audience_reaction_score", 0.0)),
+                score_reason = None,
+                scorer_model = "librosa",
+                created_at   = now_ts,
+            ))
+
+            # topic_coherence (embedder)
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "topic_coherence",
+                score_value  = float(seg.get("topic_coherence_score", 0.5)),
+                score_reason = None,
+                scorer_model = "all-MiniLM-L6-v2",
+                created_at   = now_ts,
+            ))
+
+            # composite
+            score_rows.append(AnalysisScore(
+                score_id     = str(_uuid.uuid4()),
+                item_id      = item_id,
+                segment_id   = seg_id,
+                score_type   = "composite",
+                score_value  = float(seg["composite_virality_score"]),
+                score_reason = llm.get("highlight_reason", ""),
+                scorer_model = "kairos-scorer-v1",
+                created_at   = now_ts,
+            ))
+
+        db.bulk_save_objects(score_rows)
+        db.commit()
+        logger.info(
+            "analysis_task: inserted %d score rows for item %s",
+            len(score_rows), item_id,
+        )
+
+        # ── Step 8: Auto-create Clip rows for segments above threshold ─────────
+        clip_candidates = [
+            seg for seg in scored_segments if seg.get("is_auto_clip_candidate")
+        ]
+
+        clip_rows = []
+        for seg in clip_candidates:
+            duration_ms = max(0, seg["end_ms"] - seg["start_ms"])
+            clip_rows.append(Clip(
+                clip_id        = str(_uuid.uuid4()),
+                item_id        = item_id,
+                clip_title     = None,
+                start_ms       = seg["start_ms"],
+                end_ms         = seg["end_ms"],
+                duration_ms    = duration_ms,
+                clip_file_path = None,
+                clip_thumb_path= None,
+                virality_score = seg["composite_virality_score"],
+                clip_status    = "pending",
+                clip_source    = "ai",
+                speaker_label  = seg.get("speaker_label"),
+                clip_transcript= seg.get("segment_text", ""),
+                error_msg      = None,
+                created_at     = now_ts,
+                updated_at     = now_ts,
+            ))
+
+        if clip_rows:
+            db.bulk_save_objects(clip_rows)
+            db.commit()
+
+        logger.info(
+            "analysis_task: completed for item %s — %d segments scored, %d clips auto-created",
+            item_id, len(scored_segments), len(clip_rows),
+        )
+
+        # ── Step 9: Note for Phase 4 ──────────────────────────────────────────
+        if clip_rows:
+            logger.info(
+                "analysis_task: clip extraction task will be added in Phase 4 (%d clips pending)",
+                len(clip_rows),
+            )
+
+    except Exception as exc:
+        logger.exception("analysis_task: unexpected error for item %s", item_id)
     finally:
         db.close()

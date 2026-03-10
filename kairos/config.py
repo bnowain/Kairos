@@ -49,6 +49,7 @@ KAIROS_PORT = int(os.environ.get("KAIROS_PORT", "8400"))
 
 # ── LLM / Whisper settings (Phase 2+) ────────────────────────────────────────
 OLLAMA_HOST     = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL    = os.environ.get("OLLAMA_MODEL", "llama3")
 HF_TOKEN        = os.environ.get("HF_TOKEN", "")
 WHISPER_MODEL   = os.environ.get("WHISPER_MODEL", "large-v3")
 WHISPER_DEVICE  = os.environ.get("WHISPER_DEVICE", "cuda")
