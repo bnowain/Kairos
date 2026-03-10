@@ -283,3 +283,63 @@ class StoryGenerateRequest(BaseModel):
     pacing:       Optional[str] = None
     min_score:    float = 0.5
     project_id:   Optional[str] = None
+
+
+# ── Render (Phase 6) ──────────────────────────────────────────────────────────
+
+class RenderRequest(BaseModel):
+    timeline_id: str
+    quality: str = "preview"                          # preview | final
+    apply_captions: bool = True
+    caption_style_id: Optional[str] = None
+    reframe_aspect_ratio: Optional[str] = None        # None | "9:16" | "1:1" | "16:9"
+
+
+class RenderJobOut(BaseModel):
+    render_id: str
+    timeline_id: str
+    render_quality: str
+    output_path: Optional[str] = None
+    encoder: Optional[str] = None
+    render_status: str
+    render_params: Optional[str] = None               # JSON string
+    error_msg: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+# ── Captions (Phase 6) ────────────────────────────────────────────────────────
+
+class CaptionStyleCreate(BaseModel):
+    style_name: str
+    platform_preset: Optional[str] = None
+    font_name: str = "Arial"
+    font_size: int = 48
+    font_color: str = "#FFFFFF"
+    outline_color: str = "#000000"
+    outline_width: int = 2
+    shadow: int = 1
+    animation_type: Optional[str] = None
+    position: str = "bottom"
+    style_params: Optional[str] = None
+
+
+class CaptionStyleOut(BaseModel):
+    style_id: str
+    style_name: str
+    platform_preset: Optional[str] = None
+    font_name: str
+    font_size: int
+    font_color: str
+    outline_color: str
+    outline_width: int
+    shadow: int
+    animation_type: Optional[str] = None
+    position: str
+    style_params: Optional[str] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}

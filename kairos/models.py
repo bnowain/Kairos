@@ -226,6 +226,7 @@ class RenderJob(Base):
     encoder       = Column(Text, nullable=True)                # h264_nvenc | libx264
     render_status = Column(Text, nullable=False, default="queued")
     # queued | running | done | error
+    render_params = Column(Text, nullable=True)                # JSON: apply_captions, caption_style_id, reframe_aspect_ratio
     error_msg     = Column(Text, nullable=True)
     started_at    = Column(Text, nullable=True)
     completed_at  = Column(Text, nullable=True)

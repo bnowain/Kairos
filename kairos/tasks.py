@@ -926,3 +926,233 @@ def build_story_task(
         raise
     finally:
         db.close()
+
+
+# ── Phase 6: Render task ───────────────────────────────────────────────────────
+
+@huey_gpu.task()
+def render_task(render_id: str):
+    """
+    Full render pipeline for one RenderJob.
+
+    Steps:
+    1. Load RenderJob + Timeline + TimelineElements from DB
+    2. Build clip_file_map: {clip_id: abs_path} — skip missing files with warning
+    3. If apply_captions: generate ASS file
+    4. If reframe_aspect_ratio: compute crop_params per clip via aspect_ratio services
+    5. Call preview_renderer or final_renderer based on quality
+    6. Update RenderJob via queue_manager (complete or fail)
+    7. Update Timeline.timeline_status = 'done'
+
+    Render output path: media/renders/{timeline_id}/{render_id}_{quality}.mp4
+    """
+    import json as _json
+
+    from kairos.database import SessionLocal
+    from kairos.models import Clip, RenderJob, Timeline, TimelineElement
+    from kairos.config import BASE_DIR
+    from kairos.services.renderer.queue_manager import (
+        start_render_job, complete_render_job, fail_render_job,
+    )
+
+    db = SessionLocal()
+    try:
+        # ── Step 1: Load job + timeline + elements ────────────────────────────
+        job = db.query(RenderJob).filter(RenderJob.render_id == render_id).first()
+        if not job:
+            logger.error("render_task: render_id %s not found", render_id)
+            return
+
+        timeline = db.query(Timeline).filter(Timeline.timeline_id == job.timeline_id).first()
+        if not timeline:
+            logger.error("render_task: timeline %s not found for render %s", job.timeline_id, render_id)
+            fail_render_job(db, render_id, f"Timeline {job.timeline_id} not found")
+            return
+
+        start_render_job(db, render_id)
+
+        # Parse render_params JSON
+        render_params: dict = {}
+        if job.render_params:
+            try:
+                render_params = _json.loads(job.render_params)
+            except Exception:
+                logger.warning("render_task: could not parse render_params for %s", render_id)
+
+        apply_captions = render_params.get("apply_captions", True)
+        caption_style_id = render_params.get("caption_style_id")
+        reframe_aspect_ratio = render_params.get("reframe_aspect_ratio")
+
+        # Load timeline elements ordered by position
+        elements = (
+            db.query(TimelineElement)
+            .filter(TimelineElement.timeline_id == job.timeline_id)
+            .order_by(TimelineElement.position)
+            .all()
+        )
+        elements_dicts = [
+            {
+                "element_id": e.element_id,
+                "element_type": e.element_type,
+                "position": e.position,
+                "start_ms": e.start_ms,
+                "duration_ms": e.duration_ms,
+                "clip_id": e.clip_id,
+                "element_params": e.element_params,
+            }
+            for e in elements
+        ]
+
+        # ── Step 2: Build clip_file_map ───────────────────────────────────────
+        clip_ids = [e["clip_id"] for e in elements_dicts if e.get("clip_id")]
+        clips = db.query(Clip).filter(Clip.clip_id.in_(clip_ids)).all() if clip_ids else []
+
+        clip_file_map: dict[str, str] = {}
+        for clip in clips:
+            if clip.clip_file_path:
+                abs_path = str(BASE_DIR / clip.clip_file_path)
+                from pathlib import Path as _Path
+                if _Path(abs_path).exists():
+                    clip_file_map[clip.clip_id] = abs_path
+                else:
+                    logger.warning(
+                        "render_task: clip file missing for clip_id=%s path=%s",
+                        clip.clip_id, abs_path,
+                    )
+            else:
+                logger.warning("render_task: clip_id=%s has no clip_file_path", clip.clip_id)
+
+        if not clip_file_map:
+            fail_render_job(db, render_id, "No clip files found — all clips missing from disk")
+            return
+
+        # ── Step 3: Generate captions (optional) ─────────────────────────────
+        caption_ass_path: str = None
+        if apply_captions:
+            try:
+                from kairos.models import CaptionStyle
+                from kairos.services.caption_engine.generator import generate_timeline_captions
+                from kairos.services.caption_engine.styler import get_default_style, write_ass_file
+                from kairos.services.aspect_ratio.reframer import RESOLUTIONS
+
+                style_dict = get_default_style()
+                if caption_style_id:
+                    style_obj = db.query(CaptionStyle).filter(
+                        CaptionStyle.style_id == caption_style_id
+                    ).first()
+                    if style_obj:
+                        style_dict = {
+                            "font_name": style_obj.font_name,
+                            "font_size": style_obj.font_size,
+                            "font_color": style_obj.font_color,
+                            "outline_color": style_obj.outline_color,
+                            "outline_width": style_obj.outline_width,
+                            "shadow": style_obj.shadow,
+                            "animation_type": style_obj.animation_type,
+                            "position": style_obj.position,
+                        }
+
+                captions = generate_timeline_captions(
+                    db=db,
+                    timeline_elements=elements_dicts,
+                    clip_file_map=clip_file_map,
+                    style=style_dict,
+                )
+
+                if captions:
+                    captions_dir = BASE_DIR / "media" / "captions"
+                    captions_dir.mkdir(parents=True, exist_ok=True)
+                    ass_file = str(captions_dir / f"{render_id}.ass")
+                    resolution = RESOLUTIONS.get(timeline.aspect_ratio or "16:9", (1920, 1080))
+                    write_ass_file(captions, style_dict, ass_file, resolution=resolution)
+                    caption_ass_path = ass_file
+                    logger.info("render_task: generated %d caption cues — %s", len(captions), ass_file)
+                else:
+                    logger.info("render_task: no captions generated (no transcription segments)")
+
+            except Exception as exc:
+                logger.warning("render_task: caption generation failed (non-fatal) — %s", exc)
+                caption_ass_path = None
+
+        # ── Step 4: Compute crop_params per clip (optional) ──────────────────
+        crop_params: dict = None
+        if reframe_aspect_ratio:
+            try:
+                from kairos.services.aspect_ratio.tracker import compute_tracking_crop, get_median_crop
+
+                crop_params = {}
+                for clip in clips:
+                    if clip.clip_id not in clip_file_map:
+                        continue
+                    clip_path = clip_file_map[clip.clip_id]
+                    tracking = compute_tracking_crop(
+                        clip_path=clip_path,
+                        target_ratio=reframe_aspect_ratio,
+                    )
+                    median_crop = get_median_crop(tracking)
+                    crop_params[clip.clip_id] = median_crop
+                    logger.debug(
+                        "render_task: crop for clip %s → %s", clip.clip_id, median_crop
+                    )
+                logger.info("render_task: computed crop_params for %d clips", len(crop_params))
+            except Exception as exc:
+                logger.warning("render_task: crop_params computation failed (non-fatal) — %s", exc)
+                crop_params = None
+
+        # ── Step 5: Render ────────────────────────────────────────────────────
+        aspect_ratio = timeline.aspect_ratio or "16:9"
+        output_dir = BASE_DIR / "media" / "renders" / job.timeline_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = str(output_dir / f"{render_id}_{job.render_quality}.mp4")
+
+        if job.render_quality == "preview":
+            from kairos.services.renderer.preview_renderer import render_preview
+            result = render_preview(
+                timeline_elements=elements_dicts,
+                clip_file_map=clip_file_map,
+                output_path=output_path,
+                aspect_ratio=aspect_ratio,
+                caption_ass_path=caption_ass_path,
+            )
+        else:
+            from kairos.services.renderer.final_renderer import render_final
+            result = render_final(
+                timeline_elements=elements_dicts,
+                clip_file_map=clip_file_map,
+                output_path=output_path,
+                aspect_ratio=aspect_ratio,
+                caption_ass_path=caption_ass_path,
+                crop_params=crop_params,
+            )
+
+        # ── Step 6: Update RenderJob ──────────────────────────────────────────
+        if result["success"]:
+            encoder_used = result.get("encoder_used", "libx264")
+            if job.render_quality == "preview":
+                encoder_used = "libx264"
+            complete_render_job(db, render_id, output_path, encoder_used)
+            logger.info(
+                "render_task: completed render %s — %s encoder=%s duration=%dms",
+                render_id, output_path, encoder_used, result.get("duration_ms", 0),
+            )
+        else:
+            error_msg = result.get("error", "Unknown render error")
+            fail_render_job(db, render_id, error_msg)
+            logger.error("render_task: render %s failed — %s", render_id, error_msg)
+            return
+
+        # ── Step 7: Update Timeline status ────────────────────────────────────
+        tl = db.query(Timeline).filter(Timeline.timeline_id == job.timeline_id).first()
+        if tl:
+            tl.timeline_status = "done"
+            tl.updated_at = _now()
+            db.commit()
+
+    except Exception as exc:
+        logger.exception("render_task: unexpected error for render %s", render_id)
+        try:
+            fail_render_job(db, render_id, str(exc)[:1000])
+        except Exception:
+            pass
+    finally:
+        db.close()
