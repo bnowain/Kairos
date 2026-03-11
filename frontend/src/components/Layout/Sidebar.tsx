@@ -1,18 +1,19 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Scissors, Zap, Video, Settings } from 'lucide-react'
+import { Film, Scissors, Bolt, Zap, Video, Settings } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 const navItems = [
-  { to: '/', label: 'Library', icon: Film, end: true },
-  { to: '/clips', label: 'Clips', icon: Scissors, end: false },
-  { to: '/stories', label: 'Story Builder', icon: Zap, end: false },
-  { to: '/render', label: 'Render Queue', icon: Video, end: false },
-  { to: '/settings', label: 'Settings', icon: Settings, end: false },
+  { to: '/',        label: 'Library',       icon: Film,     end: true  },
+  { to: '/clips',   label: 'Clips',         icon: Scissors, end: false },
+  { to: '/quick',   label: 'Quick',         icon: Bolt,     end: false },
+  { to: '/stories', label: 'Story Builder', icon: Zap,      end: false },
+  { to: '/render',  label: 'Render Queue',  icon: Video,    end: false },
+  { to: '/settings',label: 'Settings',      icon: Settings, end: false },
 ]
 
 export function Sidebar() {
   return (
-    <aside className="w-56 shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 h-full">
+    <aside className="hidden md:flex w-56 shrink-0 flex-col bg-gray-900 border-r border-gray-800 h-full">
       <div className="px-4 py-5 border-b border-gray-800">
         <span className="text-lg font-bold text-white tracking-tight">Kairos</span>
         <p className="text-xs text-gray-500 mt-0.5">AI Video Clipping</p>

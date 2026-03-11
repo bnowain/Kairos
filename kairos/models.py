@@ -231,3 +231,28 @@ class RenderJob(Base):
     started_at    = Column(Text, nullable=True)
     completed_at  = Column(Text, nullable=True)
     created_at    = Column(Text, nullable=False)
+
+
+class QuickJob(Base):
+    """
+    Single-touch orchestrated job: download → transcribe → analyze → story → render.
+    Created by POST /api/jobs/quick; progress tracked by GET /api/jobs/{job_id}.
+    """
+    __tablename__ = "quick_jobs"
+
+    job_id           = Column(Text, primary_key=True)
+    urls             = Column(Text, nullable=False)           # JSON array of source URLs
+    template_id      = Column(Text, nullable=True)            # story template
+    caption_style_id = Column(Text, nullable=True)            # optional caption preset
+    aspect_ratio     = Column(Text, nullable=False, default="9:16")  # 9:16 | 16:9 | 1:1
+    job_status       = Column(Text, nullable=False, default="queued")
+    # queued | downloading | transcribing | analyzing | generating | rendering | done | error
+    stage_label      = Column(Text, nullable=True)            # human-readable stage description
+    progress         = Column(Integer, nullable=False, default=0)  # 0–100
+    item_ids         = Column(Text, nullable=True)            # JSON array of created item_ids
+    timeline_id      = Column(Text, nullable=True)            # created timeline
+    render_id        = Column(Text, nullable=True)            # created render job
+    output_path      = Column(Text, nullable=True)            # final video file path
+    error_msg        = Column(Text, nullable=True)
+    created_at       = Column(Text, nullable=False)
+    updated_at       = Column(Text, nullable=False)

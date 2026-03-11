@@ -4,6 +4,7 @@ import { AppShell } from './components/Layout/AppShell'
 import LibraryPage from './pages/LibraryPage'
 import ItemPage from './pages/ItemPage'
 import ClipsPage from './pages/ClipsPage'
+import QuickJobPage from './pages/QuickJobPage'
 import StoryPage from './pages/StoryPage'
 import TimelinePage from './pages/TimelinePage'
 import RenderPage from './pages/RenderPage'
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/" element={<LibraryPage />} />
             <Route path="/item/:item_id" element={<ItemPage />} />
             <Route path="/clips" element={<ClipsPage />} />
+            <Route path="/quick" element={<QuickJobPage />} />
             <Route path="/stories" element={<StoryPage />} />
             <Route path="/timeline/:timeline_id" element={<TimelinePage />} />
             <Route path="/render" element={<RenderPage />} />

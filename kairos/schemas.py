@@ -342,4 +342,27 @@ class CaptionStyleOut(BaseModel):
     style_params: Optional[str] = None
     created_at: str
 
+
+# ── Quick Jobs (Mobile M1) ────────────────────────────────────────────────────
+
+class QuickJobIn(BaseModel):
+    urls: list[str] = Field(..., min_length=1, description="One or more source video URLs")
+    template_id: str = Field(..., description="Story template ID (e.g. viral_reel)")
+    caption_style_id: Optional[str] = None
+    aspect_ratio: str = Field("9:16", description="Output aspect ratio: 9:16 | 16:9 | 1:1")
+
+
+class QuickJobOut(BaseModel):
+    job_id: str
+    job_status: str
+    stage_label: Optional[str] = None
+    progress: int
+    item_ids: Optional[list[str]] = None
+    timeline_id: Optional[str] = None
+    render_id: Optional[str] = None
+    output_path: Optional[str] = None
+    error_msg: Optional[str] = None
+    created_at: str
+    updated_at: str
+
     model_config = {"from_attributes": True}
