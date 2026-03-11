@@ -3,11 +3,12 @@ Acquisition router — on-demand downloads and monitored source management.
 """
 
 import logging
+import shutil
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from kairos.database import get_db
@@ -48,6 +49,66 @@ def _detect_platform(url: str) -> str:
     if "vimeo.com" in url_lower:
         return "vimeo"
     return "other"
+
+
+# ── Camera-roll / file upload ─────────────────────────────────────────────────
+
+@router.post("/upload", response_model=DownloadResponse, status_code=202)
+def upload_video(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Accept a video file uploaded from the user's device (camera roll, local file).
+    Saves to media_library/local/{year}/ and immediately enqueues the ingest pipeline.
+    """
+    from kairos.tasks import ingest_task
+    from kairos.config import MEDIA_LIBRARY_ROOT
+
+    now = _now()
+    year = now[:4]
+    item_id = str(uuid.uuid4())
+
+    original_name = file.filename or "upload.mp4"
+    ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else "mp4"
+
+    dest_dir = MEDIA_LIBRARY_ROOT / "local" / year
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / f"{item_id}.{ext}"
+
+    try:
+        with dest_path.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
+    finally:
+        file.file.close()
+
+    # Store path relative to BASE_DIR so ingest_task can resolve it
+    from kairos.config import BASE_DIR
+    rel_path = str(dest_path.relative_to(BASE_DIR))
+
+    item = MediaItem(
+        item_id=item_id,
+        platform="local",
+        item_title=title or original_name,
+        file_path=rel_path,
+        item_status="downloaded",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(item)
+    db.commit()
+
+    ingest_task(item_id)
+
+    logger.info("Uploaded local file: item_id=%s path=%s", item_id, rel_path)
+    return DownloadResponse(
+        item_id=item_id,
+        status="ingesting",
+        message=f"File saved. Track progress via GET /api/library/{item_id}",
+    )
 
 
 # ── On-demand download ────────────────────────────────────────────────────────

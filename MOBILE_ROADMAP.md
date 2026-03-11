@@ -31,22 +31,21 @@ accessed by any device on the same network.
 
 ---
 
-## M2 — Mobile Library + Camera Roll Upload
+## M2 — Mobile Library + Camera Roll Upload (DONE)
 
 **Goal:** Browse the library and add videos from the device's camera roll.
 
-### Planned features
-- Mobile-optimized `LibraryPage` — swipeable card list instead of grid
-- "Add from camera roll" button — `<input type="file" accept="video/*" capture>` uploads to a new `POST /api/acquisition/upload` endpoint
-- Local video gets ingested through the same pipeline (ingest → transcribe → analyze)
-- Upload progress indicator (chunked or multipart)
-- Item detail page layout optimized for portrait (transcript tab scrollable, analysis tab collapsible)
+### Delivered
+- **`POST /api/acquisition/upload`** — multipart file upload; saves to `media_library/local/{year}/`, creates `MediaItem(platform="local")`, enqueues `ingest_task`
+- **Mobile card layout** — `grid-cols-1` on mobile (horizontal thumbnail-left card), multi-column grid on sm+
+- **Camera roll upload button** in `LibraryPage` — hidden `<input type="file" accept="video/*">` triggered by Upload button; shows XHR progress bar + error banner
+- **Pull-to-refresh** — Refresh button visible on mobile (below sm), auto-polling already handles live updates
+- **Responsive `ItemPage`** — header stacks vertically on mobile (back+title row, then action buttons row); `px-4 sm:px-6` padding
 
-### TODOs
-- [ ] `POST /api/acquisition/upload` — accepts multipart file, saves to `media_library/`, creates `MediaItem(platform="local")`, enqueues ingest
-- [ ] Mobile card layout for LibraryPage
-- [ ] Pull-to-refresh on library list
-- [ ] Responsive `ItemPage` — stack tabs vertically on mobile
+### TODOs / Known Gaps
+- [ ] True swipe-gesture pull-to-refresh (currently a tap button; needs a touch library for gesture)
+- [ ] Chunked upload for very large files (currently single-shot multipart — fine for typical camera videos)
+- [ ] Upload title prompt (currently uses filename; could add a modal to name the video before upload)
 
 ---
 

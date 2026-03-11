@@ -41,3 +41,32 @@ export function downloadVideo(url: string): Promise<{ item_id: string; status: s
 export function deleteMediaItem(itemId: string): Promise<{ status: string }> {
   return apiFetch(`/api/library/${itemId}`, { method: 'DELETE' })
 }
+
+export function uploadVideo(
+  file: File,
+  title?: string,
+  onProgress?: (pct: number) => void,
+): Promise<{ item_id: string; status: string; message: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const formData = new FormData()
+    formData.append('file', file)
+    if (title) formData.append('title', title)
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    })
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText) as { item_id: string; status: string; message: string })
+      } else {
+        reject(new Error(`Upload failed ${xhr.status}: ${xhr.responseText}`))
+      }
+    })
+    xhr.addEventListener('error', () => reject(new Error('Upload network error')))
+    xhr.open('POST', 'http://localhost:8400/api/acquisition/upload')
+    xhr.send(formData)
+  })
+}

@@ -207,25 +207,27 @@ export default function ItemPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-start gap-3 px-6 py-4 border-b border-gray-800 bg-gray-950">
-        <Button variant="ghost" size="sm" aria-label="Back to library" onClick={() => navigate('/')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-base font-semibold text-gray-100 truncate">
-              {item.item_title ?? 'Untitled'}
-            </h1>
-            <Badge variant={STATUS_VARIANT[item.item_status] ?? 'default'}>
-              {item.item_status}
-            </Badge>
+      {/* Header — stacks vertically on mobile, inline on sm+ */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-800 bg-gray-950">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <Button variant="ghost" size="sm" aria-label="Back to library" onClick={() => navigate('/')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base font-semibold text-gray-100 truncate">
+                {item.item_title ?? 'Untitled'}
+              </h1>
+              <Badge variant={STATUS_VARIANT[item.item_status] ?? 'default'}>
+                {item.item_status}
+              </Badge>
+            </div>
+            {item.item_channel && (
+              <p className="text-sm text-gray-500 mt-0.5">{item.item_channel}</p>
+            )}
           </div>
-          {item.item_channel && (
-            <p className="text-sm text-gray-500 mt-0.5">{item.item_channel}</p>
-          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap sm:shrink-0 pl-9 sm:pl-0">
           <Button
             size="sm"
             variant="secondary"

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchLibrary, fetchMediaItem, downloadVideo, deleteMediaItem } from '../api/library'
+import { useCallback, useState } from 'react'
+import { fetchLibrary, fetchMediaItem, downloadVideo, deleteMediaItem, uploadVideo } from '../api/library'
 import type { LibraryListParams } from '../api/library'
 
 const TERMINAL_STATUSES = new Set(['ready', 'error'])
@@ -48,4 +49,33 @@ export function useDeleteMediaItem() {
       void qc.invalidateQueries({ queryKey: ['library'] })
     },
   })
+}
+
+export function useUploadVideo() {
+  const qc = useQueryClient()
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const upload = useCallback(
+    async (file: File, title?: string) => {
+      setIsUploading(true)
+      setUploadProgress(0)
+      setUploadError(null)
+      try {
+        const result = await uploadVideo(file, title, setUploadProgress)
+        void qc.invalidateQueries({ queryKey: ['library'] })
+        return result
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setUploadError(msg)
+        throw err
+      } finally {
+        setIsUploading(false)
+      }
+    },
+    [qc],
+  )
+
+  return { upload, uploadProgress, isUploading, uploadError }
 }
