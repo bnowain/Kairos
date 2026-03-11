@@ -22,6 +22,7 @@ def render_preview(
     output_path: str,
     aspect_ratio: str = "16:9",
     caption_ass_path: str = None,
+    fonts_dir: str = None,
 ) -> dict:
     """
     Fast low-quality render for preview/scrubbing.
@@ -40,6 +41,7 @@ def render_preview(
             caption_ass_path=caption_ass_path,
             encoder="libx264",
             crop_params=None,
+            fonts_dir=fonts_dir,
         )
     except ValueError as exc:
         logger.error("render_preview: build_render_command failed — %s", exc)

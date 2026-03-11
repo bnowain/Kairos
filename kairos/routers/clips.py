@@ -157,6 +157,29 @@ def create_clip(body: ClipCreate, db = Depends(get_db)):
     return clip
 
 
+# ── POST /api/clips/batch/extract ────────────────────────────────────────────
+# NOTE: must be declared BEFORE /{clip_id} routes so "batch" is not treated as a clip_id
+
+@router.post("/batch/extract")
+def batch_extract(
+    body: Optional[dict] = None,
+    db = Depends(get_db),
+):
+    """
+    Enqueue extract_clip_task for all pending clips.
+
+    Optional body: {"item_id": "<uuid>"} to restrict to one item.
+    """
+    item_id = None
+    if body:
+        item_id = body.get("item_id")
+
+    from kairos.services.clip_engine.batch_clipper import enqueue_pending_clips
+    count = enqueue_pending_clips(db, item_id=item_id)
+
+    return {"enqueued": count}
+
+
 # ── GET /api/clips/{clip_id} ──────────────────────────────────────────────────
 
 @router.get("/{clip_id}", response_model=ClipOut)
@@ -262,23 +285,3 @@ def re_extract_clip(clip_id: str, db = Depends(get_db)):
     return {"clip_id": clip_id, "status": "queued"}
 
 
-# ── POST /api/clips/batch/extract ────────────────────────────────────────────
-
-@router.post("/batch/extract")
-def batch_extract(
-    body: Optional[dict] = None,
-    db = Depends(get_db),
-):
-    """
-    Enqueue extract_clip_task for all pending clips.
-
-    Optional body: {"item_id": "<uuid>"} to restrict to one item.
-    """
-    item_id = None
-    if body:
-        item_id = body.get("item_id")
-
-    from kairos.services.clip_engine.batch_clipper import enqueue_pending_clips
-    count = enqueue_pending_clips(db, item_id=item_id)
-
-    return {"enqueued": count}

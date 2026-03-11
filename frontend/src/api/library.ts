@@ -1,0 +1,43 @@
+import { apiFetch } from './client'
+import type { MediaItem } from './types'
+
+export interface LibraryListParams {
+  page?: number
+  page_size?: number
+  status?: string
+  platform?: string
+  q?: string
+}
+
+export interface LibraryListResponse {
+  items: MediaItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export function fetchLibrary(params: LibraryListParams = {}): Promise<LibraryListResponse> {
+  const qs = new URLSearchParams()
+  if (params.page) qs.set('page', String(params.page))
+  if (params.page_size) qs.set('page_size', String(params.page_size))
+  if (params.status) qs.set('status', params.status)
+  if (params.platform) qs.set('platform', params.platform)
+  if (params.q) qs.set('q', params.q)
+  const query = qs.toString()
+  return apiFetch<LibraryListResponse>(`/api/library${query ? `?${query}` : ''}`)
+}
+
+export function fetchMediaItem(itemId: string): Promise<MediaItem> {
+  return apiFetch<MediaItem>(`/api/library/${itemId}`)
+}
+
+export function downloadVideo(url: string): Promise<{ item_id: string; status: string }> {
+  return apiFetch('/api/acquisition/download', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  })
+}
+
+export function deleteMediaItem(itemId: string): Promise<{ status: string }> {
+  return apiFetch(`/api/library/${itemId}`, { method: 'DELETE' })
+}

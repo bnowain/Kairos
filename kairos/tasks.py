@@ -1105,6 +1105,9 @@ def render_task(render_id: str):
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(output_dir / f"{render_id}_{job.render_quality}.mp4")
 
+        from kairos.config import BASE_DIR as _BASE_DIR
+        _fonts_dir = str(_BASE_DIR / "fonts") if (_BASE_DIR / "fonts").is_dir() else None
+
         if job.render_quality == "preview":
             from kairos.services.renderer.preview_renderer import render_preview
             result = render_preview(
@@ -1113,6 +1116,7 @@ def render_task(render_id: str):
                 output_path=output_path,
                 aspect_ratio=aspect_ratio,
                 caption_ass_path=caption_ass_path,
+                fonts_dir=_fonts_dir,
             )
         else:
             from kairos.services.renderer.final_renderer import render_final
@@ -1123,6 +1127,7 @@ def render_task(render_id: str):
                 aspect_ratio=aspect_ratio,
                 caption_ass_path=caption_ass_path,
                 crop_params=crop_params,
+                fonts_dir=_fonts_dir,
             )
 
         # ── Step 6: Update RenderJob ──────────────────────────────────────────

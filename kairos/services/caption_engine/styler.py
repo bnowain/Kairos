@@ -7,12 +7,52 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from kairos.config import BASE_DIR
+
 logger = logging.getLogger(__name__)
 
+# ── Font registry ─────────────────────────────────────────────────────────────
+# Maps logical font names to filenames in BASE_DIR/fonts/.
+# When a name resolves to an existing file, the absolute path is used so FFmpeg
+# and ASS renderers can find the font without system installation.
+
+FONTS_DIR = BASE_DIR / "fonts"
+
+_FONT_MAP: dict[str, str] = {
+    "Impact": "Impact.ttf",
+    "BebasNeue": "BebasNeue-Regular.ttf",
+    "Bebas Neue": "BebasNeue-Regular.ttf",
+    "Arial": "Arial-Regular.ttf",
+    "Arial Bold": "Arial-Bold.ttf",
+    "Helvetica": "Arial-Regular.ttf",  # substitute
+    "Liberation Sans": "Arial-Regular.ttf",
+    "Montserrat Bold": "Montserrat-Bold.ttf",
+    "Montserrat Black": "Montserrat-Black.ttf",
+    "Montserrat": "Montserrat-Bold.ttf",
+    "NotoSans": "NotoSans-Regular.ttf",
+    "Noto Sans": "NotoSans-Regular.ttf",
+}
+
+
+def resolve_font_path(font_name: str) -> str | None:
+    """
+    Return absolute path for a font name if we have it bundled.
+    Returns None if the font is not in our local registry (system font fallback).
+    """
+    filename = _FONT_MAP.get(font_name)
+    if not filename:
+        return None
+    abs_path = FONTS_DIR / filename
+    if abs_path.exists():
+        return str(abs_path)
+    logger.warning("resolve_font_path: bundled font not found on disk: %s", abs_path)
+    return None
+
 # Built-in platform presets
+# font_name is the logical ASS name; bundled font files are in BASE_DIR/fonts/
 PLATFORM_PRESETS: dict[str, dict] = {
     "tiktok": {
-        "font_name": "Impact",
+        "font_name": "Impact",     # Impact.ttf bundled
         "font_size": 72,
         "font_color": "#FFFFFF",
         "outline_color": "#000000",
@@ -21,8 +61,18 @@ PLATFORM_PRESETS: dict[str, dict] = {
         "position": "bottom",
         "animation_type": "word_highlight",
     },
+    "tiktok_bebas": {
+        "font_name": "BebasNeue",  # BebasNeue-Regular.ttf bundled
+        "font_size": 80,
+        "font_color": "#FFFF00",   # yellow, classic TikTok style
+        "outline_color": "#000000",
+        "outline_width": 4,
+        "shadow": 0,
+        "position": "bottom",
+        "animation_type": "word_highlight",
+    },
     "youtube": {
-        "font_name": "Arial",
+        "font_name": "Arial",      # Arial-Regular.ttf bundled
         "font_size": 48,
         "font_color": "#FFFFFF",
         "outline_color": "#000000",
@@ -32,13 +82,23 @@ PLATFORM_PRESETS: dict[str, dict] = {
         "animation_type": "none",
     },
     "instagram": {
-        "font_name": "Helvetica",
+        "font_name": "Montserrat Bold",  # Montserrat-Bold.ttf bundled
         "font_size": 56,
         "font_color": "#FFFFFF",
         "outline_color": "#000000",
         "outline_width": 2,
         "shadow": 1,
         "position": "center",
+        "animation_type": "none",
+    },
+    "podcast": {
+        "font_name": "NotoSans",   # NotoSans-Regular.ttf bundled
+        "font_size": 42,
+        "font_color": "#EEEEEE",
+        "outline_color": "#111111",
+        "outline_width": 1,
+        "shadow": 1,
+        "position": "bottom",
         "animation_type": "none",
     },
 }
@@ -100,6 +160,15 @@ def build_ass_header(style: dict, resolution: tuple[int, int]) -> str:
     W, H = resolution
     alignment = _position_to_alignment(style.get("position", "bottom"))
     font_name = style.get("font_name", "Arial")
+
+    # Use absolute path if we have the font bundled — ensures FFmpeg finds it
+    resolved_path = resolve_font_path(font_name)
+    if resolved_path:
+        logger.debug("build_ass_header: using bundled font %s", resolved_path)
+        # For ASS, Fontname must be the logical name (not path).
+        # We attach the path via fontsdir hint in the caller.
+        # Store resolved_path in style so the render step can pass -fontsdir.
+        style = {**style, "_font_path": resolved_path}
     font_size = int(style.get("font_size", 48))
     primary_color = hex_to_ass_color(style.get("font_color", "#FFFFFF"))
     outline_color = hex_to_ass_color(style.get("outline_color", "#000000"))

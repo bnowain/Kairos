@@ -51,6 +51,7 @@ def render_final(
     aspect_ratio: str = "16:9",
     caption_ass_path: str = None,
     crop_params: dict = None,
+    fonts_dir: str = None,
 ) -> dict:
     """
     High-quality final render. Tries NVENC first, falls back to libx264.
@@ -79,6 +80,7 @@ def render_final(
                 caption_ass_path=caption_ass_path,
                 encoder=enc,
                 crop_params=crop_params,
+                fonts_dir=fonts_dir,
             )
         except ValueError as exc:
             logger.error("render_final: build_render_command failed — %s", exc)

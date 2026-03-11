@@ -138,6 +138,7 @@ def build_render_command(
     caption_ass_path: str = None,
     encoder: str = None,
     crop_params: dict = None,
+    fonts_dir: str = None,
 ) -> list[str]:
     """
     Build and return the complete FFmpeg argument list (not including 'ffmpeg' itself).
@@ -344,7 +345,13 @@ def build_render_command(
     if caption_ass_path:
         # Escape path for FFmpeg filter
         safe_ass = caption_ass_path.replace("\\", "/").replace("'", "\\'").replace(":", "\\:")
-        filter_parts.append(f"[v_concat]subtitles='{safe_ass}'[v_out]")
+        # Pass fontsdir so FFmpeg resolves bundled fonts by name in the ASS file
+        if fonts_dir:
+            safe_fontsdir = str(fonts_dir).replace("\\", "/").replace("'", "\\'").replace(":", "\\:")
+            subtitle_filter = f"subtitles='{safe_ass}':fontsdir='{safe_fontsdir}'"
+        else:
+            subtitle_filter = f"subtitles='{safe_ass}'"
+        filter_parts.append(f"[v_concat]{subtitle_filter}[v_out]")
         final_v_label = "v_out"
     else:
         filter_parts.append(f"[v_concat]null[v_out]")
