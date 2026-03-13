@@ -1,9 +1,12 @@
 """
-Quick Jobs API — Mobile M1.
+Quick Jobs API — Mobile M1 + M3.
 
 POST /api/jobs/quick          — create + start an orchestrated quick job
 GET  /api/jobs/{job_id}       — poll job status / progress
 GET  /api/jobs                — list recent quick jobs (newest first)
+GET  /api/jobs/{job_id}/download — FileResponse for completed job output
+POST /api/jobs/{job_id}/retry — reset + re-run a failed/completed job
+DELETE /api/jobs/{job_id}     — cancel a running job
 """
 
 from __future__ import annotations
@@ -12,8 +15,10 @@ import json
 import logging
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from kairos.database import get_db
@@ -32,6 +37,9 @@ def _now() -> str:
 def _to_out(job: QuickJob) -> QuickJobOut:
     return QuickJobOut(
         job_id           = job.job_id,
+        urls             = json.loads(job.urls) if job.urls else [],
+        template_id      = job.template_id,
+        aspect_ratio     = job.aspect_ratio,
         job_status       = job.job_status,
         stage_label      = job.stage_label,
         progress         = job.progress,
@@ -112,3 +120,95 @@ def list_quick_jobs(
         .all()
     )
     return [_to_out(j) for j in jobs]
+
+
+# ── GET /api/jobs/{job_id}/download ──────────────────────────────────────────
+
+@router.get("/{job_id}/download")
+def download_quick_job(job_id: str, db: Session = Depends(get_db)):
+    """Stream the completed render output as a FileResponse."""
+    job = db.query(QuickJob).filter(QuickJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"QuickJob {job_id!r} not found")
+
+    if job.job_status != "done":
+        raise HTTPException(
+            status_code=404,
+            detail=f"QuickJob {job_id!r} is not done yet (status={job.job_status})",
+        )
+
+    if not job.output_path or not Path(job.output_path).exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output file not found for job {job_id!r}",
+        )
+
+    filename = Path(job.output_path).name
+    return FileResponse(
+        path=job.output_path,
+        media_type="video/mp4",
+        filename=filename,
+    )
+
+
+# ── POST /api/jobs/{job_id}/retry ────────────────────────────────────────────
+
+@router.post("/{job_id}/retry", response_model=QuickJobOut)
+def retry_quick_job(job_id: str, db: Session = Depends(get_db)):
+    """Reset a failed or completed job and re-run it from scratch."""
+    job = db.query(QuickJob).filter(QuickJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"QuickJob {job_id!r} not found")
+
+    if job.job_status not in ("error", "done", "cancelled"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot retry job in status {job.job_status!r} — must be error, done, or cancelled",
+        )
+
+    now = _now()
+    job.job_status  = "queued"
+    job.stage_label = "Queued"
+    job.progress    = 0
+    job.error_msg   = None
+    job.output_path = None
+    job.timeline_id = None
+    job.render_id   = None
+    job.item_ids    = None
+    job.updated_at  = now
+    db.commit()
+    db.refresh(job)
+
+    from kairos.services.orchestrator import start_quick_job
+    start_quick_job(job.job_id)
+
+    logger.info("Quick job %s retried", job.job_id)
+    return _to_out(job)
+
+
+# ── DELETE /api/jobs/{job_id} ────────────────────────────────────────────────
+
+@router.delete("/{job_id}")
+def cancel_quick_job(job_id: str, db: Session = Depends(get_db)):
+    """Cancel a running job.  Returns immediately; thread stops at next stage boundary."""
+    job = db.query(QuickJob).filter(QuickJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"QuickJob {job_id!r} not found")
+
+    if job.job_status in ("done", "error", "cancelled"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot cancel job in status {job.job_status!r}",
+        )
+
+    from kairos.services.orchestrator import request_cancel
+    found = request_cancel(job_id)
+
+    if not found:
+        # Thread not running — mark cancelled directly
+        job.job_status  = "cancelled"
+        job.stage_label = "Cancelled"
+        job.updated_at  = _now()
+        db.commit()
+
+    return {"cancelled": True}

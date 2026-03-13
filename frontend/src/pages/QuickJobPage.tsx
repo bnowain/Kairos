@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, Zap, ChevronRight, Download, AlertCircle } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import {
+  Plus, Trash2, Zap, ChevronRight, Download, AlertCircle,
+  Share2, ClipboardList, RotateCcw, XCircle,
+} from 'lucide-react'
 import { TopBar } from '../components/Layout/TopBar'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -8,7 +12,9 @@ import { Progress } from '../components/ui/Progress'
 import { Spinner } from '../components/ui/Spinner'
 import { fetchTemplates } from '../api/stories'
 import { fetchCaptionStyles } from '../api/captions'
-import { createQuickJob, getQuickJob } from '../api/jobs'
+import {
+  createQuickJob, getQuickJob, retryQuickJob, cancelQuickJob, downloadQuickJobUrl,
+} from '../api/jobs'
 import type { QuickJobOut } from '../api/jobs'
 
 type AspectRatio = '9:16' | '16:9' | '1:1'
@@ -28,6 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
   rendering:    'text-teal-400',
   done:         'text-green-400',
   error:        'text-red-400',
+  cancelled:    'text-gray-500',
 }
 
 // ── Progress polling hook ─────────────────────────────────────────────────────
@@ -37,13 +44,13 @@ function useJobPoller(jobId: string | null) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    if (!jobId) return
+    if (!jobId) { setJob(null); return }
 
     const poll = async () => {
       try {
         const data = await getQuickJob(jobId)
         setJob(data)
-        if (data.job_status === 'done' || data.job_status === 'error') {
+        if (['done', 'error', 'cancelled'].includes(data.job_status)) {
           if (intervalRef.current) clearInterval(intervalRef.current)
         }
       } catch {
@@ -62,13 +69,17 @@ function useJobPoller(jobId: string | null) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function QuickJobPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [urls, setUrls] = useState<string[]>([''])
   const [templateId, setTemplateId] = useState<string>('')
   const [captionStyleId, setCaptionStyleId] = useState<string | null>(null)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobId, setJobId] = useState<string | null>(searchParams.get('job_id'))
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const job = useJobPoller(jobId)
 
@@ -109,6 +120,7 @@ export default function QuickJobPage() {
         aspect_ratio: aspectRatio,
       })
       setJobId(result.job_id)
+      setSearchParams({ job_id: result.job_id })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to start job')
       setSubmitting(false)
@@ -119,23 +131,75 @@ export default function QuickJobPage() {
     setJobId(null)
     setSubmitting(false)
     setSubmitError(null)
+    setRetrying(false)
+    setCancelling(false)
     setUrls([''])
+    setSearchParams({})
   }
+
+  const handleRetry = async () => {
+    if (!jobId) return
+    setRetrying(true)
+    try {
+      const result = await retryQuickJob(jobId)
+      setJobId(result.job_id)
+      setRetrying(false)
+    } catch {
+      setRetrying(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!jobId) return
+    setCancelling(true)
+    try {
+      await cancelQuickJob(jobId)
+    } catch {
+      // ignore
+    }
+    setCancelling(false)
+  }
+
+  const handleShare = async () => {
+    if (!jobId) return
+    const url = downloadQuickJobUrl(jobId)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Kairos Video', url })
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url)
+    }
+  }
+
+  const isRunning = jobId && job && !['done', 'error', 'cancelled'].includes(job.job_status)
 
   // ── Progress screen ───────────────────────────────────────────────────────
   if (jobId) {
     const statusColor = STATUS_COLORS[job?.job_status ?? 'queued'] ?? 'text-gray-400'
-    const isDone  = job?.job_status === 'done'
-    const isError = job?.job_status === 'error'
+    const isDone      = job?.job_status === 'done'
+    const isError     = job?.job_status === 'error'
+    const isCancelled = job?.job_status === 'cancelled'
 
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <TopBar title="Quick Job" />
+        <TopBar
+          title="Quick Job"
+          actions={
+            <button
+              onClick={() => navigate('/jobs')}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <ClipboardList className="w-4 h-4" />
+              History
+            </button>
+          }
+        />
         <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
           <div className="w-full max-w-md flex flex-col gap-4">
             {/* Status indicator */}
             <div className="flex flex-col items-center gap-2 text-center">
-              {!isDone && !isError && <Spinner size="lg" />}
+              {!isDone && !isError && !isCancelled && <Spinner size="lg" />}
               {isDone && (
                 <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
                   <Zap className="w-6 h-6 text-green-400" />
@@ -144,6 +208,11 @@ export default function QuickJobPage() {
               {isError && (
                 <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
                   <AlertCircle className="w-6 h-6 text-red-400" />
+                </div>
+              )}
+              {isCancelled && (
+                <div className="w-12 h-12 rounded-full bg-gray-500/20 flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-gray-400" />
                 </div>
               )}
               <p className={`text-sm font-semibold ${statusColor}`}>
@@ -162,16 +231,25 @@ export default function QuickJobPage() {
               </div>
             )}
 
-            {/* Download button when done */}
+            {/* Download + share buttons when done */}
             {isDone && job?.output_path && (
-              <a
-                href={`http://localhost:8400/media/${job.output_path}`}
-                download
-                className="flex items-center justify-center gap-2 rounded-md bg-green-600 hover:bg-green-500 px-4 py-2.5 text-sm font-medium text-white transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download video
-              </a>
+              <div className="flex gap-2">
+                <a
+                  href={downloadQuickJobUrl(job.job_id)}
+                  download
+                  className="flex-1 flex items-center justify-center gap-2 rounded-md bg-green-600 hover:bg-green-500 px-4 py-2.5 text-sm font-medium text-white transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download video
+                </a>
+                <button
+                  onClick={handleShare}
+                  className="flex items-center justify-center gap-2 rounded-md border border-gray-700 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
+              </div>
             )}
             {isDone && !job?.output_path && (
               <p className="text-sm text-gray-400 text-center">
@@ -181,10 +259,32 @@ export default function QuickJobPage() {
 
             {/* Action buttons */}
             <div className="flex gap-2 mt-2">
-              {(isDone || isError) && (
-                <Button variant="secondary" className="flex-1" onClick={handleReset}>
-                  Start new job
+              {isRunning && (
+                <Button
+                  variant="secondary"
+                  className="flex-1 text-red-400 border-red-800/50"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                >
+                  <XCircle className="w-4 h-4 mr-1.5" />
+                  {cancelling ? 'Cancelling…' : 'Cancel'}
                 </Button>
+              )}
+              {(isDone || isError || isCancelled) && (
+                <>
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={handleRetry}
+                    disabled={retrying}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                    {retrying ? 'Retrying…' : 'Retry'}
+                  </Button>
+                  <Button variant="secondary" className="flex-1" onClick={handleReset}>
+                    Start new job
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -196,7 +296,18 @@ export default function QuickJobPage() {
   // ── Input form ────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <TopBar title="Quick Job" />
+      <TopBar
+        title="Quick Job"
+        actions={
+          <button
+            onClick={() => navigate('/jobs')}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <ClipboardList className="w-4 h-4" />
+            History
+          </button>
+        }
+      />
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-lg mx-auto p-4 md:p-6 flex flex-col gap-6">
 

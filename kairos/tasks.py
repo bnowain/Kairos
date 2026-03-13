@@ -1132,6 +1132,11 @@ def render_task(render_id: str):
 
         # ── Step 6: Update RenderJob ──────────────────────────────────────────
         if result["success"]:
+            from pathlib import Path as _Path
+            if not _Path(output_path).exists():
+                fail_render_job(db, render_id, f"Render reported success but output file missing: {output_path}")
+                logger.error("render_task: output file missing after success — %s", output_path)
+                return
             encoder_used = result.get("encoder_used", "libx264")
             if job.render_quality == "preview":
                 encoder_used = "libx264"

@@ -48,8 +48,11 @@ LOGS_DIR      = BASE_DIR / "logs"
 KAIROS_PORT = int(os.environ.get("KAIROS_PORT", "8400"))
 
 # ── LLM / Whisper settings (Phase 2+) ────────────────────────────────────────
+LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "ollama")        # ollama | mission_control
 OLLAMA_HOST     = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL    = os.environ.get("OLLAMA_MODEL", "llama3")
+MC_HOST         = os.environ.get("MC_HOST", "http://localhost:8860")
+MC_MODEL_ID     = os.environ.get("MC_MODEL_ID", "")               # e.g. anthropic/claude-sonnet-4-6, leave empty for MC default routing
 HF_TOKEN        = os.environ.get("HF_TOKEN", "")
 WHISPER_MODEL   = os.environ.get("WHISPER_MODEL", "large-v3")
 WHISPER_DEVICE  = os.environ.get("WHISPER_DEVICE", "cuda")

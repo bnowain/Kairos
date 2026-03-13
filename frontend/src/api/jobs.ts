@@ -9,6 +9,9 @@ export interface QuickJobIn {
 
 export interface QuickJobOut {
   job_id: string
+  urls: string[]
+  template_id: string | null
+  aspect_ratio: string
   job_status: string
   stage_label: string | null
   progress: number
@@ -34,4 +37,16 @@ export function getQuickJob(jobId: string): Promise<QuickJobOut> {
 
 export function listQuickJobs(): Promise<QuickJobOut[]> {
   return apiFetch('/api/jobs')
+}
+
+export function retryQuickJob(jobId: string): Promise<QuickJobOut> {
+  return apiFetch(`/api/jobs/${jobId}/retry`, { method: 'POST' })
+}
+
+export function cancelQuickJob(jobId: string): Promise<{ cancelled: boolean }> {
+  return apiFetch(`/api/jobs/${jobId}`, { method: 'DELETE' })
+}
+
+export function downloadQuickJobUrl(jobId: string): string {
+  return `http://localhost:8400/api/jobs/${jobId}/download`
 }

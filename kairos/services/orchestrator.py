@@ -31,6 +31,31 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL = 5        # seconds between DB polls
 _STAGE_TIMEOUT = 1800     # 30 minutes per stage
 
+# ── Cooperative cancellation ──────────────────────────────────────────────────
+
+_cancel_events: dict[str, threading.Event] = {}
+
+
+def request_cancel(job_id: str) -> bool:
+    """Signal a running job to cancel.  Returns True if the event was found."""
+    ev = _cancel_events.get(job_id)
+    if ev is None:
+        return False
+    ev.set()
+    return True
+
+
+def _check_cancelled(db, job, event: threading.Event) -> bool:
+    """Return True (and mark job cancelled) if cancellation was requested."""
+    if event.is_set():
+        job.job_status = "cancelled"
+        job.stage_label = "Cancelled"
+        job.updated_at = _now()
+        db.commit()
+        logger.info("QuickJob %s cancelled by user", job.job_id)
+        return True
+    return False
+
 
 def _now() -> str:
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
@@ -387,6 +412,9 @@ def run_quick_job(job_id: str) -> None:
     from kairos.models import MediaItem, QuickJob
     from kairos.tasks import download_task
 
+    cancel_ev = _cancel_events.get(job_id) or threading.Event()
+    _cancel_events[job_id] = cancel_ev
+
     db = SessionLocal()
     try:
         job = db.query(QuickJob).filter(QuickJob.job_id == job_id).first()
@@ -400,6 +428,8 @@ def run_quick_job(job_id: str) -> None:
         aspect_ratio: str = job.aspect_ratio
 
         # ── Stage 1: Download ─────────────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
         _set_stage(db, job, "downloading", f"Downloading {len(urls)} video(s)…", 5)
 
         item_ids: list[str] = []
@@ -433,6 +463,8 @@ def run_quick_job(job_id: str) -> None:
             return
 
         # ── Stage 2: Transcribe ───────────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
         _set_stage(db, job, "transcribing", "Transcribing audio…", 25)
 
         tj_ids = _run_transcribing(db, job, item_ids)
@@ -443,6 +475,8 @@ def run_quick_job(job_id: str) -> None:
             return
 
         # ── Stage 3: Analyze ──────────────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
         _set_stage(db, job, "analyzing", "Analyzing content…", 50)
         _run_analyzing(db, job, item_ids)
 
@@ -450,6 +484,8 @@ def run_quick_job(job_id: str) -> None:
         _generate_clips(db, item_ids)
 
         # ── Stage 4: Generate story ───────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
         _set_stage(db, job, "generating", "Building story timeline…", 70)
         timeline_id = _run_generating(db, job, item_ids, template_id, aspect_ratio)
         if timeline_id is None:
@@ -460,6 +496,8 @@ def run_quick_job(job_id: str) -> None:
         db.commit()
 
         # ── Stage 5: Render ───────────────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
         _set_stage(db, job, "rendering", "Rendering video…", 80)
         render_id = _run_rendering(db, job, timeline_id, caption_style_id, aspect_ratio)
         if render_id is None:
@@ -473,9 +511,18 @@ def run_quick_job(job_id: str) -> None:
             return
 
         # ── Done ──────────────────────────────────────────────────────────────
+        if _check_cancelled(db, job, cancel_ev):
+            return
+
+        from pathlib import Path as _Path
         from kairos.models import RenderJob
         rjob = db.query(RenderJob).filter(RenderJob.render_id == render_id).first()
         output_path = rjob.output_path if rjob else None
+
+        # Validate output file exists on disk
+        if output_path and not _Path(output_path).exists():
+            _fail(db, job, f"Render completed but output file missing: {output_path}")
+            return
 
         job.job_status  = "done"
         job.stage_label = "Complete"
@@ -494,6 +541,7 @@ def run_quick_job(job_id: str) -> None:
         except Exception:
             pass
     finally:
+        _cancel_events.pop(job_id, None)
         db.close()
 
 

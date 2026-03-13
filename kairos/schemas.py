@@ -354,6 +354,9 @@ class QuickJobIn(BaseModel):
 
 class QuickJobOut(BaseModel):
     job_id: str
+    urls: list[str] = []
+    template_id: Optional[str] = None
+    aspect_ratio: str = "9:16"
     job_status: str
     stage_label: Optional[str] = None
     progress: int

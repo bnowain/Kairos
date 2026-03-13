@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Scissors, Bolt, Zap, Video, Settings } from 'lucide-react'
+import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 const navItems = [
   { to: '/',        label: 'Library',       icon: Film,     end: true  },
   { to: '/clips',   label: 'Clips',         icon: Scissors, end: false },
   { to: '/quick',   label: 'Quick',         icon: Bolt,     end: false },
+  { to: '/jobs',    label: 'Jobs',          icon: ClipboardList, end: false },
   { to: '/stories', label: 'Story Builder', icon: Zap,      end: false },
   { to: '/render',  label: 'Render Queue',  icon: Video,    end: false },
   { to: '/settings',label: 'Settings',      icon: Settings, end: false },
