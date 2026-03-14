@@ -51,3 +51,16 @@ export function batchExtractClips(clipIds?: string[]): Promise<{ queued: number 
 export function deleteClip(clipId: string): Promise<{ status: string }> {
   return apiFetch(`/api/clips/${clipId}`, { method: 'DELETE' })
 }
+
+export function createClip(body: {
+  item_id: string
+  start_ms: number
+  end_ms: number
+  clip_title?: string
+  remove_silence?: boolean
+}): Promise<Clip> {
+  return apiFetch('/api/clips', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}

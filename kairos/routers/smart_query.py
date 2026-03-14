@@ -34,6 +34,7 @@ from kairos.models import (
 from kairos.schemas import (
     SmartQueryIn, SmartQueryOut, QueryCandidateOut,
     CandidateRatingIn, IntentProfileIn, IntentProfileOut, IntentExampleOut,
+    PushQueryIn,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,60 @@ def get_smart_query_results(
         .all()
     )
     return candidates
+
+
+# ── CLI push endpoint ────────────────────────────────────────────────────
+
+@router.post("/api/smart-query/push", response_model=SmartQueryOut, status_code=201)
+def push_smart_query(req: PushQueryIn, db: Session = Depends(get_db)):
+    """
+    Inject a pre-scored Smart Query from an external tool (e.g. Claude Code CLI).
+
+    Creates a query in 'done' status with all candidates already scored.
+    Results appear immediately in the Kairos UI for review, rating, and clip import.
+    """
+    now = _now()
+    query_id = str(uuid.uuid4())
+
+    q = SmartQuery(
+        query_id=query_id,
+        query_text=req.query_text,
+        query_source="kairos",
+        query_status="done",
+        query_stage_label="Pushed from CLI",
+        query_progress=100,
+        query_result_count=len(req.candidates),
+        scorer_models=json.dumps([req.scorer_model]),
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(q)
+
+    for cand_in in req.candidates:
+        cand = QueryCandidate(
+            candidate_id=str(uuid.uuid4()),
+            query_id=query_id,
+            candidate_origin="kairos",
+            candidate_item_id=cand_in.candidate_item_id,
+            candidate_segment_id=cand_in.candidate_segment_id,
+            candidate_speaker=cand_in.candidate_speaker,
+            candidate_text=cand_in.candidate_text,
+            candidate_start_ms=cand_in.candidate_start_ms,
+            candidate_end_ms=cand_in.candidate_end_ms,
+            candidate_video_title=cand_in.candidate_video_title,
+            candidate_video_date=cand_in.candidate_video_date,
+            candidate_source_url=cand_in.candidate_source_url,
+            intent_relevance_score=cand_in.intent_relevance_score,
+            intent_score_reason=cand_in.intent_score_reason,
+            intent_scorer_model=req.scorer_model,
+            created_at=now,
+        )
+        db.add(cand)
+
+    db.commit()
+    db.refresh(q)
+    logger.info("push_smart_query: injected %d candidates for query %s", len(req.candidates), query_id)
+    return _query_to_out(q)
 
 
 # ── Candidate feedback endpoints ─────────────────────────────────────────────

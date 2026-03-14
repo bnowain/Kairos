@@ -3,8 +3,12 @@ System router — health, config, and job status endpoints.
 """
 
 import logging
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -27,6 +31,9 @@ from kairos.schemas import ConfigOut, HealthOut, JobStatusOut
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["system"])
+
+MC_URL = "http://127.0.0.1:8860"
+MC_PROJECT_ROOT = Path("/mnt/e/0-Automated-Apps/Mission_Control")
 
 
 @router.get("/health", response_model=HealthOut)
@@ -105,3 +112,46 @@ def list_recent_jobs(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     # Sort combined list by created_at descending
     results.sort(key=lambda j: j.created_at, reverse=True)
     return results[:50]
+
+
+# ── Mission Control status / control ─────────────────────────────────────────
+
+@router.get("/mc/status")
+def mc_status():
+    """Check if Mission Control is reachable at localhost:8860."""
+    try:
+        resp = httpx.get(f"{MC_URL}/api/health", timeout=2.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {"available": True, "status": data.get("status", "ok")}
+    except Exception:
+        pass
+    return {"available": False, "status": "offline"}
+
+
+@router.post("/mc/start")
+def mc_start():
+    """
+    Start Mission Control as a background process.
+    Returns immediately — caller should poll /api/mc/status to confirm it's up.
+    """
+    run_script = MC_PROJECT_ROOT / "run.py"
+    if not run_script.exists():
+        return {"started": False, "error": "Mission Control not found at expected path"}
+
+    mc_venv_python = MC_PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exe = str(mc_venv_python) if mc_venv_python.exists() else sys.executable
+
+    try:
+        subprocess.Popen(
+            [python_exe, str(run_script), "--no-browser", "--no-cleanup"],
+            cwd=str(MC_PROJECT_ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        logger.info("mc_start: launched Mission Control via %s", run_script)
+        return {"started": True}
+    except Exception as exc:
+        logger.error("mc_start: failed to launch Mission Control: %s", exc)
+        return {"started": False, "error": str(exc)}

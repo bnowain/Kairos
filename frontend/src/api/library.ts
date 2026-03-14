@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, apiUrl } from './client'
 import type { MediaItem } from './types'
 
 export interface LibraryListParams {
@@ -40,6 +40,10 @@ export function downloadVideo(url: string): Promise<{ item_id: string; status: s
 
 export function deleteMediaItem(itemId: string): Promise<{ status: string }> {
   return apiFetch(`/api/library/${itemId}`, { method: 'DELETE' })
+}
+
+export function streamUrl(itemId: string): string {
+  return apiUrl(`/api/library/${itemId}/stream`)
 }
 
 export function uploadVideo(

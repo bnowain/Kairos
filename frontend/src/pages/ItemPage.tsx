@@ -1,10 +1,11 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, FileText, BarChart2, Scissors, Loader2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Spinner } from '../components/ui/Spinner'
 import { Tabs } from '../components/ui/Tabs'
 import { SegmentList } from '../components/Transcript/SegmentList'
+import { SyncedPlayer } from '../components/Player/SyncedPlayer'
 import { ScorePanel } from '../components/Analysis/ScorePanel'
 import { ClipGrid } from '../components/Clips/ClipGrid'
 import { useMediaItem } from '../hooks/useLibrary'
@@ -13,7 +14,7 @@ import { useHighlights, useStartAnalysis } from '../hooks/useAnalysis'
 import { useClips, useGenerateClips } from '../hooks/useClips'
 import { apiUrl } from '../api/client'
 import { formatDate, formatDurationSeconds } from '../utils/format'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AnalysisHighlight } from '../api/types'
 
 const STATUS_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
@@ -28,7 +29,17 @@ const STATUS_VARIANT: Record<string, 'default' | 'info' | 'warning' | 'success' 
 export default function ItemPage() {
   const { item_id } = useParams<{ item_id: string }>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const timeParam = searchParams.get('t')
+  const initialTimeMs = timeParam ? parseInt(timeParam, 10) : undefined
+
+  const [activeTab, setActiveTab] = useState(tabParam || 'overview')
+
+  // Sync tab from URL params on mount / change
+  useEffect(() => {
+    if (tabParam) setActiveTab(tabParam)
+  }, [tabParam])
 
   const { data: item, isLoading: itemLoading } = useMediaItem(item_id ?? '')
   const { data: segments = [], isLoading: segmentsLoading } = useSegments(item_id ?? '')
@@ -155,11 +166,19 @@ export default function ItemPage() {
             </div>
           )}
           <div className="flex-1 overflow-hidden">
-            <SegmentList
-              segments={segments}
-              isLoading={segmentsLoading}
-              itemId={item_id ?? ''}
-            />
+            {item.file_path && item.item_status === 'ready' ? (
+              <SyncedPlayer
+                itemId={item_id ?? ''}
+                segments={segments}
+                initialTimeMs={initialTimeMs}
+              />
+            ) : (
+              <SegmentList
+                segments={segments}
+                isLoading={segmentsLoading}
+                itemId={item_id ?? ''}
+              />
+            )}
           </div>
         </div>
       ),

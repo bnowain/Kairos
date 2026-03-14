@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Search, ThumbsUp, ThumbsDown, Import, ChevronDown, ChevronUp,
-  AlertCircle, CheckCircle2, Loader2, Plus,
+  AlertCircle, CheckCircle2, Loader2, Plus, ExternalLink,
 } from 'lucide-react'
 import { TopBar } from '../components/Layout/TopBar'
 import { Button } from '../components/ui/Button'
@@ -64,9 +65,10 @@ function ScoreBar({ score }: { score: number }) {
 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
-function CandidateCard({ candidate, onUpdate }: {
+function CandidateCard({ candidate, onUpdate, onViewInContext }: {
   candidate: QueryCandidateOut
   onUpdate: () => void
+  onViewInContext?: (candidate: QueryCandidateOut) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [rating, setRating] = useState(candidate.candidate_user_rating)
@@ -172,6 +174,15 @@ function CandidateCard({ candidate, onUpdate }: {
             Imported
           </span>
         )}
+        {onViewInContext && candidate.candidate_item_id && candidate.candidate_origin === 'kairos' && (
+          <button
+            onClick={() => onViewInContext(candidate)}
+            className="flex items-center gap-1 ml-auto px-2 py-1 rounded text-xs text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View in context
+          </button>
+        )}
       </div>
     </div>
   )
@@ -181,6 +192,7 @@ function CandidateCard({ candidate, onUpdate }: {
 
 export default function SmartQueryPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [queryText, setQueryText] = useState('')
   const [activeQueryId, setActiveQueryId] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null)
@@ -303,6 +315,10 @@ export default function SmartQueryPage() {
                 key={c.candidate_id}
                 candidate={c}
                 onUpdate={() => refetchResults()}
+                onViewInContext={(cand) => {
+                  const t = cand.candidate_start_ms ?? 0
+                  navigate(`/item/${cand.candidate_item_id}?tab=transcript&t=${t}`)
+                }}
               />
             ))}
 

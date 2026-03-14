@@ -84,6 +84,7 @@ export interface Clip {
   speaker_label: string | null
   clip_transcript: string | null
   error_msg: string | null
+  item_title?: string | null
   created_at: string
   updated_at: string
 }

@@ -1,6 +1,9 @@
-import { Film, Download, Play } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Film, Download, Play, ExternalLink } from 'lucide-react'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
+import { SpeakerBadge } from '../Transcript/SpeakerBadge'
 import { apiUrl } from '../../api/client'
 import { formatDuration, formatScore } from '../../utils/format'
 import { useExtractClip } from '../../hooks/useClips'
@@ -19,26 +22,47 @@ const statusVariant: Record<string, 'default' | 'info' | 'warning' | 'success' |
 
 export function ClipCard({ clip }: ClipCardProps) {
   const { mutate: extract, isPending } = useExtractClip()
+  const navigate = useNavigate()
+  const [showPlayer, setShowPlayer] = useState(false)
   const filename = clip.clip_file_path?.split('/').pop()
   const thumbFilename = clip.clip_thumb_path?.split('/').pop()
 
   return (
     <div className="flex flex-col rounded-lg bg-gray-900 border border-gray-800 overflow-hidden">
-      {/* Thumbnail */}
+      {/* Thumbnail / Inline player */}
       <div className="relative aspect-video bg-gray-800 overflow-hidden">
-        {thumbFilename ? (
-          <img
-            src={apiUrl(`/media/thumbs/${thumbFilename}`)}
-            alt={clip.clip_title ?? 'Clip'}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              ;(e.target as HTMLImageElement).style.display = 'none'
-            }}
+        {showPlayer && clip.clip_status === 'ready' && filename ? (
+          <video
+            src={apiUrl(`/api/clips/${clip.clip_id}/download`)}
+            controls
+            autoPlay
+            className="w-full h-full object-contain bg-black"
           />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <Film className="h-8 w-8 text-gray-600" />
-          </div>
+          <>
+            {thumbFilename ? (
+              <img
+                src={apiUrl(`/media/thumbs/${thumbFilename}`)}
+                alt={clip.clip_title ?? 'Clip'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <Film className="h-8 w-8 text-gray-600" />
+              </div>
+            )}
+            {clip.clip_status === 'ready' && filename && (
+              <button
+                onClick={() => setShowPlayer(true)}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity"
+              >
+                <Play className="h-10 w-10 text-white drop-shadow-lg" />
+              </button>
+            )}
+          </>
         )}
         <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white font-mono">
           {formatDuration(clip.duration_ms)}
@@ -50,6 +74,23 @@ export function ClipCard({ clip }: ClipCardProps) {
         <p className="text-sm font-medium text-gray-200 line-clamp-2">
           {clip.clip_title ?? 'Untitled Clip'}
         </p>
+
+        {/* Speaker + source video */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {clip.speaker_label && (
+            <SpeakerBadge speaker={clip.speaker_label} />
+          )}
+          {clip.item_title && (
+            <button
+              onClick={() => navigate(`/item/${clip.item_id}?tab=transcript&t=${clip.start_ms}`)}
+              className="text-xs text-gray-500 hover:text-blue-400 truncate max-w-[160px] flex items-center gap-0.5 transition-colors"
+              title={clip.item_title}
+            >
+              <ExternalLink className="w-3 h-3 shrink-0" />
+              {clip.item_title}
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center justify-between">
           <Badge variant={statusVariant[clip.clip_status] ?? 'default'}>
@@ -81,7 +122,7 @@ export function ClipCard({ clip }: ClipCardProps) {
           )}
           {clip.clip_status === 'ready' && filename && (
             <a
-              href={apiUrl(`/media/clips/${filename}`)}
+              href={apiUrl(`/api/clips/${clip.clip_id}/download`)}
               download
               className="flex-1"
             >

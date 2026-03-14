@@ -12,6 +12,15 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from kairos.config import BASE_DIR, MEDIA_LIBRARY_ROOT, THUMBS_DIR
+
+MIME_MAP = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mkv": "video/x-matroska",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".m4v": "video/mp4",
+}
 from kairos.database import get_db
 from kairos.models import Clip, MediaItem, TranscriptionJob, TranscriptionSegment
 from kairos.schemas import MediaItemDetail, MediaItemOut
@@ -161,4 +170,32 @@ def get_thumbnail(item_id: str, db: Session = Depends(get_db)):
         path=str(thumb),
         media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/{item_id}/stream")
+def stream_video(item_id: str, db: Session = Depends(get_db)):
+    """
+    Stream the source video file for a media item.
+    Starlette FileResponse handles HTTP 206 range requests natively.
+    """
+    item = db.query(MediaItem).filter(MediaItem.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Media item not found.")
+    if not item.file_path:
+        raise HTTPException(status_code=404, detail="No video file for this item.")
+
+    abs_path = _to_absolute(item.file_path, MEDIA_LIBRARY_ROOT)
+    if abs_path is None or not abs_path.exists():
+        abs_path = BASE_DIR / item.file_path
+        if not abs_path.exists():
+            raise HTTPException(status_code=404, detail="Video file not found on disk.")
+
+    ext = abs_path.suffix.lower()
+    media_type = MIME_MAP.get(ext, "video/mp4")
+
+    return FileResponse(
+        path=str(abs_path),
+        media_type=media_type,
+        headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600"},
     )

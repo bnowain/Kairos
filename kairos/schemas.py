@@ -228,6 +228,7 @@ class ClipOut(BaseModel):
     speaker_label:   Optional[str] = None
     clip_transcript: Optional[str] = None
     error_msg:       Optional[str] = None
+    item_title:      Optional[str] = None
     created_at:      str
     updated_at:      str
 
@@ -433,6 +434,28 @@ class IntentExampleOut(BaseModel):
     created_at: str
 
     model_config = {"from_attributes": True}
+
+
+# ── CLI Push (pre-scored query injection) ────────────────────────────────
+
+class PushCandidateIn(BaseModel):
+    candidate_text: str
+    candidate_item_id: Optional[str] = None
+    candidate_segment_id: Optional[str] = None
+    candidate_speaker: Optional[str] = None
+    candidate_start_ms: Optional[int] = None
+    candidate_end_ms: Optional[int] = None
+    candidate_video_title: Optional[str] = None
+    candidate_video_date: Optional[str] = None
+    candidate_source_url: Optional[str] = None
+    intent_relevance_score: Optional[float] = None
+    intent_score_reason: Optional[str] = None
+
+
+class PushQueryIn(BaseModel):
+    query_text: str = Field(..., description="What was searched for")
+    scorer_model: str = Field("claude_cli", description="Model that produced the scores")
+    candidates: list[PushCandidateIn] = Field(..., min_length=1)
 
 
 # ── Quick Jobs (Mobile M1) ────────────────────────────────────────────────────

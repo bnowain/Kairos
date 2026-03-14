@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchClips, generateClips, extractClip, batchExtractClips } from '../api/clips'
+import { fetchClips, generateClips, extractClip, batchExtractClips, createClip } from '../api/clips'
 import type { ClipsListParams } from '../api/clips'
 
 export function useClips(params: ClipsListParams = {}) {
@@ -45,6 +45,24 @@ export function useBatchExtractClips() {
     mutationFn: (clipIds?: string[]) => batchExtractClips(clipIds),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['clips'] })
+    },
+  })
+}
+
+export function useCreateClip() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: {
+      item_id: string
+      start_ms: number
+      end_ms: number
+      clip_title?: string
+      remove_silence?: boolean
+    }) => createClip(body),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['clips', { item_id: variables.item_id }] })
+      void qc.invalidateQueries({ queryKey: ['clips'] })
+      void qc.invalidateQueries({ queryKey: ['media-item', variables.item_id] })
     },
   })
 }

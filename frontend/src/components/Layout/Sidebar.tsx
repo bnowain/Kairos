@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { MCStatusPill } from './MCStatusPill'
 
 const navItems = [
   { to: '/',        label: 'Library',       icon: Film,     end: true  },
@@ -40,6 +41,9 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="px-3 py-3 border-t border-gray-800">
+        <MCStatusPill />
+      </div>
     </aside>
   )
 }

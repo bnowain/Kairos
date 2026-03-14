@@ -75,6 +75,7 @@ def list_clips(
     item_id: Optional[str] = Query(None, description="Filter by media item"),
     status:  Optional[str] = Query(None, description="Filter by clip_status"),
     source:  Optional[str] = Query(None, description="Filter by clip_source: ai | manual"),
+    speaker: Optional[str] = Query(None, description="Filter by speaker_label (substring match)"),
     limit:   int           = Query(50, ge=1, le=500),
     offset:  int           = Query(0, ge=0),
     db = Depends(get_db),
@@ -86,9 +87,26 @@ def list_clips(
         query = query.filter(Clip.clip_status == status)
     if source:
         query = query.filter(Clip.clip_source == source)
+    if speaker:
+        query = query.filter(Clip.speaker_label.ilike(f"%{speaker}%"))
     query = query.order_by(Clip.created_at.desc())
     clips = query.offset(offset).limit(limit).all()
-    return clips
+
+    # Populate item_title from MediaItem
+    item_ids = {c.item_id for c in clips}
+    item_titles: dict[str, str | None] = {}
+    if item_ids:
+        rows = db.query(MediaItem.item_id, MediaItem.item_title).filter(
+            MediaItem.item_id.in_(item_ids)
+        ).all()
+        item_titles = {r.item_id: r.item_title for r in rows}
+
+    results = []
+    for c in clips:
+        out = ClipOut.model_validate(c)
+        out.item_title = item_titles.get(c.item_id)
+        results.append(out)
+    return results
 
 
 # ── POST /api/clips ───────────────────────────────────────────────────────────
