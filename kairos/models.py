@@ -155,6 +155,7 @@ class Clip(Base):
     speaker_label   = Column(Text, nullable=True)
     clip_transcript = Column(Text, nullable=True)
     error_msg       = Column(Text, nullable=True)
+    query_candidate_id = Column(Text, nullable=True)             # FK → query_candidates (Smart Query import)
     created_at      = Column(Text, nullable=False)
     updated_at      = Column(Text, nullable=False)
 
@@ -231,6 +232,119 @@ class RenderJob(Base):
     started_at    = Column(Text, nullable=True)
     completed_at  = Column(Text, nullable=True)
     created_at    = Column(Text, nullable=False)
+
+
+class SmartQuery(Base):
+    """
+    A natural-language search query scored by LLM against transcript segments.
+    """
+    __tablename__ = "smart_queries"
+
+    query_id            = Column(Text, primary_key=True)
+    query_text          = Column(Text, nullable=False)
+    query_source        = Column(Text, nullable=False, default="kairos")
+    # kairos | civic_media | mixed
+    intent_profile_id   = Column(Text, nullable=True)            # FK → intent_profiles
+    query_filters       = Column(Text, nullable=True)            # JSON: {speaker, date_range, item_channel, ...}
+    query_status        = Column(Text, nullable=False, default="pending")
+    # pending | fetching | scoring | done | error
+    scorer_models       = Column(Text, nullable=True)            # JSON array of model IDs used
+    query_result_count  = Column(Integer, nullable=True, default=0)
+    query_error_msg     = Column(Text, nullable=True)
+    project_id          = Column(Text, nullable=True)            # FK → projects
+    query_progress      = Column(Integer, nullable=True, default=0)  # 0-100
+    query_stage_label   = Column(Text, nullable=True)
+    created_at          = Column(Text, nullable=False)
+    updated_at          = Column(Text, nullable=False)
+
+
+class QueryCandidate(Base):
+    """
+    A scored segment result from a Smart Query.
+    """
+    __tablename__ = "query_candidates"
+
+    candidate_id            = Column(Text, primary_key=True)
+    query_id                = Column(Text, nullable=False)       # FK → smart_queries
+    candidate_origin        = Column(Text, nullable=False, default="kairos")
+    # kairos | civic_media
+
+    # Source identifiers
+    candidate_item_id       = Column(Text, nullable=True)        # FK → media_items (kairos)
+    candidate_segment_id    = Column(Text, nullable=True)        # FK → transcription_segments (kairos)
+
+    # Denormalized content
+    candidate_speaker       = Column(Text, nullable=True)
+    candidate_text          = Column(Text, nullable=False)
+    candidate_start_ms      = Column(Integer, nullable=True)
+    candidate_end_ms        = Column(Integer, nullable=True)
+    candidate_video_title   = Column(Text, nullable=True)
+    candidate_video_date    = Column(Text, nullable=True)        # ISO 8601
+    candidate_source_url    = Column(Text, nullable=True)
+
+    # Scores
+    intent_relevance_score  = Column(Float, nullable=True)       # 0.0-1.0
+    intent_score_reason     = Column(Text, nullable=True)
+    intent_scorer_model     = Column(Text, nullable=True)
+
+    # User feedback
+    candidate_user_rating   = Column(Integer, nullable=True)     # 1 (up) | -1 (down) | NULL
+    candidate_rating_note   = Column(Text, nullable=True)
+
+    # Import tracking
+    imported_as_clip_id     = Column(Text, nullable=True)        # FK → clips
+    created_at              = Column(Text, nullable=False)
+
+
+class IntentProfile(Base):
+    """
+    A reusable scoring intent that accumulates feedback examples over time.
+    """
+    __tablename__ = "intent_profiles"
+
+    intent_profile_id       = Column(Text, primary_key=True)
+    intent_name             = Column(Text, nullable=False, unique=True)
+    intent_description      = Column(Text, nullable=True)
+    intent_system_prompt    = Column(Text, nullable=True)        # custom scoring prompt override
+    intent_example_count    = Column(Integer, nullable=True, default=0)
+    created_at              = Column(Text, nullable=False)
+    updated_at              = Column(Text, nullable=False)
+
+
+class IntentExample(Base):
+    """
+    A positive or negative example from user feedback, used for few-shot calibration.
+    """
+    __tablename__ = "intent_examples"
+
+    example_id              = Column(Text, primary_key=True)
+    intent_profile_id       = Column(Text, nullable=False)       # FK → intent_profiles
+    candidate_id            = Column(Text, nullable=True)        # FK → query_candidates
+    example_text            = Column(Text, nullable=False)
+    example_context         = Column(Text, nullable=True)        # JSON: {speaker, video_title, date}
+    example_rating          = Column(Integer, nullable=False)    # 1 (positive) | -1 (negative)
+    example_note            = Column(Text, nullable=True)
+    example_scorer_model    = Column(Text, nullable=True)
+    example_original_score  = Column(Float, nullable=True)
+    created_at              = Column(Text, nullable=False)
+
+
+class ModelScoringRun(Base):
+    """
+    Tracks a single model's scoring pass on a Smart Query.
+    """
+    __tablename__ = "model_scoring_runs"
+
+    run_id                  = Column(Text, primary_key=True)
+    query_id                = Column(Text, nullable=False)       # FK → smart_queries
+    run_model_id            = Column(Text, nullable=False)
+    run_provider            = Column(Text, nullable=False)       # ollama | mission_control | claude_cli
+    run_candidates_scored   = Column(Integer, nullable=True, default=0)
+    run_duration_ms         = Column(Integer, nullable=True)
+    run_status              = Column(Text, nullable=False, default="pending")
+    # pending | running | done | error
+    run_error_msg           = Column(Text, nullable=True)
+    created_at              = Column(Text, nullable=False)
 
 
 class QuickJob(Base):

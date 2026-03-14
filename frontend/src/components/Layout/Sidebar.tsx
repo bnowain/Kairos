@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList } from 'lucide-react'
+import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 const navItems = [
   { to: '/',        label: 'Library',       icon: Film,     end: true  },
+  { to: '/smart-query', label: 'Smart Query', icon: Search,  end: false },
   { to: '/clips',   label: 'Clips',         icon: Scissors, end: false },
   { to: '/quick',   label: 'Quick',         icon: Bolt,     end: false },
   { to: '/jobs',    label: 'Jobs',          icon: ClipboardList, end: false },

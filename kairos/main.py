@@ -110,7 +110,7 @@ async def log_request_timing(request: Request, call_next):
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-from kairos.routers import system, acquisition, library, transcription, analysis, clips, stories, timelines, render, captions, jobs  # noqa: E402
+from kairos.routers import system, acquisition, library, transcription, analysis, clips, stories, timelines, render, captions, jobs, smart_query  # noqa: E402
 
 app.include_router(system.router)
 app.include_router(acquisition.router)
@@ -123,6 +123,7 @@ app.include_router(timelines.router)
 app.include_router(render.router)
 app.include_router(captions.router)
 app.include_router(jobs.router)
+app.include_router(smart_query.router)
 
 
 # ── Static file mounts ────────────────────────────────────────────────────────

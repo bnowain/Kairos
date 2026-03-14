@@ -6,6 +6,7 @@ import ItemPage from './pages/ItemPage'
 import ClipsPage from './pages/ClipsPage'
 import QuickJobPage from './pages/QuickJobPage'
 import JobHistoryPage from './pages/JobHistoryPage'
+import SmartQueryPage from './pages/SmartQueryPage'
 import StoryPage from './pages/StoryPage'
 import TimelinePage from './pages/TimelinePage'
 import RenderPage from './pages/RenderPage'
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/clips" element={<ClipsPage />} />
             <Route path="/quick" element={<QuickJobPage />} />
             <Route path="/jobs" element={<JobHistoryPage />} />
+            <Route path="/smart-query" element={<SmartQueryPage />} />
             <Route path="/stories" element={<StoryPage />} />
             <Route path="/timeline/:timeline_id" element={<TimelinePage />} />
             <Route path="/render" element={<RenderPage />} />

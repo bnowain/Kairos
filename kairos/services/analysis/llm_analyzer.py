@@ -1,10 +1,11 @@
 """
 LLM-based highlight and virality analysis.
 
-Supports two providers (configured via LLM_PROVIDER env var):
+Supports three providers (configured via LLM_PROVIDER env var):
   - "ollama"           — direct Ollama API (default, local inference)
   - "mission_control"  — routes through Mission Control /models/run
                          (MC handles model routing, telemetry, fallbacks)
+  - "claude_cli"       — shells out to `claude -p` (uses authenticated account)
 
 Segments are sent in batches of 20 to fit context windows.
 Returns per-segment virality, hook, emotional, and controversy scores.
@@ -12,8 +13,6 @@ Returns per-segment virality, hook, emotional, and controversy scores.
 
 import json
 import logging
-import urllib.request
-import urllib.error
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -120,64 +119,12 @@ def _parse_llm_response(raw_text: str, batch: list[dict]) -> list[dict]:
     return results
 
 
-# ── Provider backends ────────────────────────────────────────────────────────
-
-def _call_ollama(prompt: str) -> str:
-    """Send prompt to Ollama and return raw response text."""
-    from kairos.config import OLLAMA_HOST, OLLAMA_MODEL
-
-    import ollama
-    client = ollama.Client(host=OLLAMA_HOST)
-    response = client.chat(
-        model=OLLAMA_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        options={"temperature": 0.1},
-    )
-    return response.get("message", {}).get("content", "")
-
-
-def _call_mission_control(prompt: str) -> str:
-    """Send prompt to Mission Control /models/run and return response text."""
-    from kairos.config import MC_HOST, MC_MODEL_ID, OLLAMA_MODEL
-
-    # model_id is required by MC — fall back to ollama model format if not configured
-    model_id = MC_MODEL_ID or f"ollama/{OLLAMA_MODEL}"
-
-    body: dict = {
-        "model_id": model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,
-        "max_tokens": 4096,
-    }
-
-    url = f"{MC_HOST}/models/run"
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            return result.get("response_text", "")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace") if exc.fp else str(exc)
-        raise RuntimeError(f"Mission Control returned {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Mission Control unreachable at {url}: {exc.reason}") from exc
-
+# ── Provider backends (delegated to shared module) ──────────────────────────
 
 def _get_provider_fn():
     """Return the appropriate LLM call function based on LLM_PROVIDER config."""
-    from kairos.config import LLM_PROVIDER
-
-    if LLM_PROVIDER == "mission_control":
-        return _call_mission_control, "mission_control"
-    else:
-        return _call_ollama, "ollama"
+    from kairos.services.llm_providers import get_provider
+    return get_provider()
 
 
 # ── Main entry point ─────────────────────────────────────────────────────────

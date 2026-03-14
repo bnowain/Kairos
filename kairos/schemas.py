@@ -343,6 +343,98 @@ class CaptionStyleOut(BaseModel):
     created_at: str
 
 
+# ── Smart Query (SQ-1) ───────────────────────────────────────────────────────
+
+class SmartQueryIn(BaseModel):
+    query_text: str = Field(..., description="Natural language search query")
+    query_source: str = Field("kairos", description="kairos | civic_media | mixed")
+    intent_profile_id: Optional[str] = None
+    filters: Optional[dict] = None
+    scorer_models: list[str] = Field(default=["default"], description="Provider names or 'default'")
+    project_id: Optional[str] = None
+    max_candidates: int = Field(100, ge=1, le=500)
+
+
+class SmartQueryOut(BaseModel):
+    query_id: str
+    query_text: str
+    query_source: str
+    query_status: str
+    query_progress: int = 0
+    query_stage_label: Optional[str] = None
+    intent_profile_id: Optional[str] = None
+    scorer_models: Optional[list[str]] = None
+    query_result_count: int = 0
+    query_error_msg: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class QueryCandidateOut(BaseModel):
+    candidate_id: str
+    query_id: str
+    candidate_origin: str
+    candidate_item_id: Optional[str] = None
+    candidate_segment_id: Optional[str] = None
+    candidate_speaker: Optional[str] = None
+    candidate_text: str
+    candidate_start_ms: Optional[int] = None
+    candidate_end_ms: Optional[int] = None
+    candidate_video_title: Optional[str] = None
+    candidate_video_date: Optional[str] = None
+    candidate_source_url: Optional[str] = None
+    intent_relevance_score: Optional[float] = None
+    intent_score_reason: Optional[str] = None
+    intent_scorer_model: Optional[str] = None
+    candidate_user_rating: Optional[int] = None
+    candidate_rating_note: Optional[str] = None
+    imported_as_clip_id: Optional[str] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class CandidateRatingIn(BaseModel):
+    rating: int = Field(..., description="1 (thumbs up) or -1 (thumbs down)")
+    note: Optional[str] = None
+    save_as_example: bool = True
+
+
+class IntentProfileIn(BaseModel):
+    intent_name: str
+    intent_description: Optional[str] = None
+    intent_system_prompt: Optional[str] = None
+
+
+class IntentProfileOut(BaseModel):
+    intent_profile_id: str
+    intent_name: str
+    intent_description: Optional[str] = None
+    intent_system_prompt: Optional[str] = None
+    intent_example_count: int = 0
+    created_at: str
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class IntentExampleOut(BaseModel):
+    example_id: str
+    intent_profile_id: str
+    candidate_id: Optional[str] = None
+    example_text: str
+    example_context: Optional[str] = None
+    example_rating: int
+    example_note: Optional[str] = None
+    example_scorer_model: Optional[str] = None
+    example_original_score: Optional[float] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
 # ── Quick Jobs (Mobile M1) ────────────────────────────────────────────────────
 
 class QuickJobIn(BaseModel):

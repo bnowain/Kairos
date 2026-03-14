@@ -48,7 +48,7 @@ LOGS_DIR      = BASE_DIR / "logs"
 KAIROS_PORT = int(os.environ.get("KAIROS_PORT", "8400"))
 
 # ── LLM / Whisper settings (Phase 2+) ────────────────────────────────────────
-LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "ollama")        # ollama | mission_control
+LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "ollama")        # ollama | mission_control | claude_cli
 OLLAMA_HOST     = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL    = os.environ.get("OLLAMA_MODEL", "llama3")
 MC_HOST         = os.environ.get("MC_HOST", "http://localhost:8860")
