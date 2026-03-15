@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { fetchLibrary, fetchMediaItem, downloadVideo, deleteMediaItem, uploadVideo } from '../api/library'
 import type { LibraryListParams } from '../api/library'
+import { toast } from '../store/useToastStore'
 
 const TERMINAL_STATUSES = new Set(['ready', 'error'])
 
@@ -37,7 +38,9 @@ export function useDownloadVideo() {
     mutationFn: (url: string) => downloadVideo(url),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['library'] })
+      toast.success('Video download started')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -47,7 +50,9 @@ export function useDeleteMediaItem() {
     mutationFn: (itemId: string) => deleteMediaItem(itemId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['library'] })
+      toast.success('Item deleted')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -65,6 +70,7 @@ export function useUploadVideo() {
       try {
         const result = await uploadVideo(file, title, setUploadProgress)
         void qc.invalidateQueries({ queryKey: ['library'] })
+        toast.success('Video uploaded successfully')
         return result
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

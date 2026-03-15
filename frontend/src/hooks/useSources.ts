@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchSources, createSource, updateSource, deleteSource, pollSource } from '../api/sources'
 import type { CreateSourceBody, UpdateSourceBody } from '../api/sources'
+import { toast } from '../store/useToastStore'
 
 export function useSources() {
   return useQuery({
@@ -15,7 +16,9 @@ export function useCreateSource() {
     mutationFn: (body: CreateSourceBody) => createSource(body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
+      toast.success('Source created')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -26,7 +29,9 @@ export function useUpdateSource() {
       updateSource(sourceId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
+      toast.success('Source updated')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -36,7 +41,9 @@ export function useDeleteSource() {
     mutationFn: (sourceId: string) => deleteSource(sourceId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
+      toast.success('Source deleted')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -46,6 +53,8 @@ export function usePollSource() {
     mutationFn: (sourceId: string) => pollSource(sourceId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
+      toast.info('Polling source...')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }

@@ -1,20 +1,25 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Film } from 'lucide-react'
 import { MediaCard } from './MediaCard'
-import { Spinner } from '../ui/Spinner'
+import { MediaCardSkeleton } from './MediaCardSkeleton'
+import { EmptyState } from '../ui/EmptyState'
 import type { MediaItem } from '../../api/types'
+import type { ReactNode } from 'react'
 
 interface MediaGridProps {
   items: MediaItem[]
   isLoading: boolean
   error?: Error | null
   onRefresh?: () => void
+  emptyAction?: ReactNode
 }
 
-export function MediaGrid({ items, isLoading, error, onRefresh }: MediaGridProps) {
+export function MediaGrid({ items, isLoading, error, onRefresh, emptyAction }: MediaGridProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 p-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <MediaCardSkeleton key={i} />
+        ))}
       </div>
     )
   }
@@ -30,10 +35,12 @@ export function MediaGrid({ items, isLoading, error, onRefresh }: MediaGridProps
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-500">
-        <p className="text-lg font-medium text-gray-400">No videos yet</p>
-        <p className="text-sm">Upload a video or click Add Video to get started.</p>
-      </div>
+      <EmptyState
+        icon={Film}
+        heading="Your library is empty"
+        description="Upload or download videos to get started"
+        action={emptyAction}
+      />
     )
   }
 

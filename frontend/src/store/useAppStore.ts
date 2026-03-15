@@ -12,6 +12,9 @@ interface AppStore {
 
   renderDialogOpen: boolean
   setRenderDialogOpen: (open: boolean) => void
+
+  shortcutHelpOpen: boolean
+  setShortcutHelpOpen: (open: boolean) => void
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -26,4 +29,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   renderDialogOpen: false,
   setRenderDialogOpen: (open) => set({ renderDialogOpen: open }),
+
+  shortcutHelpOpen: false,
+  setShortcutHelpOpen: (open) => set({ shortcutHelpOpen: open }),
 }))

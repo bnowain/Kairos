@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Rss } from 'lucide-react'
 import { TopBar } from '../components/Layout/TopBar'
 import { Button } from '../components/ui/Button'
-import { Spinner } from '../components/ui/Spinner'
 import { SourceRow } from '../components/Sources/SourceRow'
+import { SourceRowSkeleton } from '../components/Sources/SourceRowSkeleton'
 import { SourceFormDialog } from '../components/Sources/SourceFormDialog'
+import { EmptyState } from '../components/ui/EmptyState'
 import { useSources, useDeleteSource, usePollSource } from '../hooks/useSources'
 import type { AcquisitionSource } from '../api/types'
 
@@ -40,8 +41,10 @@ export default function SourcesPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
-          <div className="flex items-center justify-center h-40">
-            <Spinner size="lg" />
+          <div className="flex flex-col gap-3 max-w-3xl">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SourceRowSkeleton key={i} />
+            ))}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-40 text-red-400">
@@ -49,9 +52,17 @@ export default function SourcesPage() {
             <p className="text-sm text-gray-500">{(error as Error).message}</p>
           </div>
         ) : !sources || sources.length === 0 ? (
-          <div className="flex items-center justify-center h-40 text-gray-500">
-            <p>No sources configured. Add one to start polling for videos.</p>
-          </div>
+          <EmptyState
+            icon={Rss}
+            heading="No sources configured"
+            description="Add a source to start automatically polling for new videos."
+            action={
+              <Button onClick={handleAdd}>
+                <Plus className="h-4 w-4" />
+                Add Source
+              </Button>
+            }
+          />
         ) : (
           <div className="flex flex-col gap-3 max-w-3xl">
             {sources.map((s) => (

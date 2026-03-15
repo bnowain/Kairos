@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { Clapperboard } from 'lucide-react'
 import { TopBar } from '../components/Layout/TopBar'
 import { TemplateSelector } from '../components/StoryBuilder/TemplateSelector'
 import { StoryForm } from '../components/StoryBuilder/StoryForm'
 import { TimelinePreview } from '../components/StoryBuilder/TimelinePreview'
-import { Spinner } from '../components/ui/Spinner'
+import { Skeleton } from '../components/ui/Skeleton'
+import { EmptyState } from '../components/ui/EmptyState'
 import { fetchTemplates, generateStory } from '../api/stories'
 import { fetchLibrary } from '../api/library'
 import type { Timeline } from '../api/types'
@@ -32,8 +34,17 @@ export default function StoryPage() {
 
   if (templatesLoading || libraryLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner size="lg" />
+      <div className="flex flex-col h-full overflow-hidden">
+        <TopBar title="Story Builder" />
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 max-w-6xl mx-auto">
+            <div className="flex flex-col gap-6">
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-56 w-full" />
+            </div>
+            <Skeleton className="h-48 w-full rounded-lg border border-dashed border-gray-700" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -84,10 +95,11 @@ export default function StoryPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 rounded-lg border border-dashed border-gray-700 text-gray-500">
-                <p className="text-sm">Select a template and generate a story</p>
-                <p className="text-xs mt-1">The timeline preview will appear here</p>
-              </div>
+              <EmptyState
+                icon={Clapperboard}
+                heading="No timeline yet"
+                description="Select a template and generate a story to see the timeline preview."
+              />
             )}
           </div>
         </div>

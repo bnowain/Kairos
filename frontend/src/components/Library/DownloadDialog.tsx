@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog } from '../ui/Dialog'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
@@ -7,10 +7,17 @@ import { useDownloadVideo } from '../../hooks/useLibrary'
 interface DownloadDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultUrl?: string
 }
 
-export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
+export function DownloadDialog({ open, onOpenChange, defaultUrl }: DownloadDialogProps) {
   const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    if (open && defaultUrl) {
+      setUrl(defaultUrl)
+    }
+  }, [open, defaultUrl])
   const { mutate, isPending, error } = useDownloadVideo()
 
   function handleSubmit(e: React.FormEvent) {

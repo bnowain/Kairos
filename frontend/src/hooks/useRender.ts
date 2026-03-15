@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchRenderJobs, fetchRenderJob, createRenderJob, retryRenderJob } from '../api/render'
 import type { CreateRenderParams } from '../api/render'
+import { toast } from '../store/useToastStore'
 
 export function useRenderJobs() {
   return useQuery({
@@ -21,7 +22,9 @@ export function useCreateRenderJob() {
     mutationFn: (params: CreateRenderParams) => createRenderJob(params),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['render-jobs'] })
+      toast.info('Render job queued')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -44,6 +47,8 @@ export function useRetryRenderJob() {
     mutationFn: (renderId: string) => retryRenderJob(renderId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['render-jobs'] })
+      toast.info('Retrying render job...')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Scissors, Trash2 } from 'lucide-react'
 import { TopBar } from '../components/Layout/TopBar'
 import { ClipGrid } from '../components/Clips/ClipGrid'
@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
 import { useClips, useBatchExtractClips, useBulkDeleteClips } from '../hooks/useClips'
+import { useGlobalShortcuts } from '../hooks/useKeyboardShortcuts'
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -108,6 +109,19 @@ export default function ClipsPage() {
       onSuccess: () => setSelected(new Set()),
     })
   }
+
+  const clipShortcuts = useMemo(
+    () => ({
+      'Ctrl+a': () => {
+        setSelected(new Set(filteredClips.map((c) => c.clip_id)))
+      },
+      'Escape': () => setSelected(new Set()),
+      'Delete': () => handleBulkDelete(),
+    }),
+    [filteredClips, selected],
+  )
+
+  useGlobalShortcuts(clipShortcuts)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

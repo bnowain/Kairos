@@ -1,5 +1,7 @@
+import { Scissors } from 'lucide-react'
 import { ClipCard } from './ClipCard'
-import { Spinner } from '../ui/Spinner'
+import { ClipCardSkeleton } from './ClipCardSkeleton'
+import { EmptyState } from '../ui/EmptyState'
 import type { Clip } from '../../api/types'
 
 interface ClipGridProps {
@@ -15,8 +17,10 @@ interface ClipGridProps {
 export function ClipGrid({ clips, isLoading, error, emptyMessage, selectable, selectedIds, onToggleSelect }: ClipGridProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-40">
-        <Spinner size="lg" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <ClipCardSkeleton key={i} />
+        ))}
       </div>
     )
   }
@@ -32,9 +36,11 @@ export function ClipGrid({ clips, isLoading, error, emptyMessage, selectable, se
 
   if (clips.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-500">
-        <p>{emptyMessage ?? 'No clips yet.'}</p>
-      </div>
+      <EmptyState
+        icon={Scissors}
+        heading="No clips yet"
+        description={emptyMessage ?? 'No clips yet.'}
+      />
     )
   }
 

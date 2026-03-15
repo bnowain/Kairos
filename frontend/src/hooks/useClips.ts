@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchClips, generateClips, extractClip, batchExtractClips, createClip, deleteClip } from '../api/clips'
 import type { ClipsListParams } from '../api/clips'
+import { toast } from '../store/useToastStore'
 
 export function useClips(params: ClipsListParams = {}) {
   return useQuery({
@@ -35,7 +36,9 @@ export function useExtractClip() {
     mutationFn: (clipId: string) => extractClip(clipId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['clips'] })
+      toast.info('Clip extraction started')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -45,7 +48,9 @@ export function useBatchExtractClips() {
     mutationFn: (clipIds?: string[]) => batchExtractClips(clipIds),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['clips'] })
+      toast.info('Batch extraction started')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -63,7 +68,9 @@ export function useCreateClip() {
       void qc.invalidateQueries({ queryKey: ['clips', { item_id: variables.item_id }] })
       void qc.invalidateQueries({ queryKey: ['clips'] })
       void qc.invalidateQueries({ queryKey: ['media-item', variables.item_id] })
+      toast.success('Clip created')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -73,7 +80,9 @@ export function useDeleteClip() {
     mutationFn: (clipId: string) => deleteClip(clipId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['clips'] })
+      toast.success('Clip deleted')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
 
@@ -83,6 +92,8 @@ export function useBulkDeleteClips() {
     mutationFn: (clipIds: string[]) => Promise.all(clipIds.map((id) => deleteClip(id))),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['clips'] })
+      toast.success('Clips deleted')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }

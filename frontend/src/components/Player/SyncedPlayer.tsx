@@ -54,6 +54,36 @@ export function SyncedPlayer({ itemId, segments, initialTimeMs }: SyncedPlayerPr
     setClipOutMs(outMs)
   }, [])
 
+  // Keyboard shortcuts for video player
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const el = e.target as HTMLElement
+      const tag = el.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return
+
+      const video = videoRef.current
+      if (!video) return
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault()
+          if (video.paused) void video.play()
+          else video.pause()
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? 1 : 5))
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          video.currentTime = Math.min(video.duration || 0, video.currentTime + (e.shiftKey ? 1 : 5))
+          break
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       {/* Main content: video + transcript */}

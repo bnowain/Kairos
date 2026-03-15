@@ -4,6 +4,7 @@ import {
   fetchTranscriptionJobs,
   startTranscription,
 } from '../api/transcription'
+import { toast } from '../store/useToastStore'
 
 export function useSegments(itemId: string) {
   return useQuery({
@@ -39,6 +40,8 @@ export function useStartTranscription() {
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['transcription-jobs', variables.itemId] })
       void qc.invalidateQueries({ queryKey: ['media-item', variables.itemId] })
+      toast.info('Transcription started')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : String(err)),
   })
 }
