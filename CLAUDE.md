@@ -99,6 +99,7 @@ All three phases are fully implemented — backend services, API routers, and fr
 - **M4**: Synced video player, clip builder, enhanced clip library
 - **M5**: Story Builder UI, drag-and-drop timeline, clip preview, caption editor, render progress
 - **M6**: Source management page, create clip from highlight, clip sorting + bulk delete, mobile nav reorganization
+- **M7**: Toast notifications, loading skeletons, keyboard shortcuts, drag-and-drop import, empty states
 
 ## Architecture Reference
 
