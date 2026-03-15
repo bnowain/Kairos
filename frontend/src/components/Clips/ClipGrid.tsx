@@ -7,9 +7,12 @@ interface ClipGridProps {
   isLoading: boolean
   error?: Error | null
   emptyMessage?: string
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (clipId: string) => void
 }
 
-export function ClipGrid({ clips, isLoading, error, emptyMessage }: ClipGridProps) {
+export function ClipGrid({ clips, isLoading, error, emptyMessage, selectable, selectedIds, onToggleSelect }: ClipGridProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -38,7 +41,13 @@ export function ClipGrid({ clips, isLoading, error, emptyMessage }: ClipGridProp
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {clips.map((clip) => (
-        <ClipCard key={clip.clip_id} clip={clip} />
+        <ClipCard
+          key={clip.clip_id}
+          clip={clip}
+          selectable={selectable}
+          selected={selectedIds?.has(clip.clip_id)}
+          onToggleSelect={onToggleSelect}
+        />
       ))}
     </div>
   )

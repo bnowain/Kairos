@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search, Type } from 'lucide-react'
+import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search, Type, Rss } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { MCStatusPill } from './MCStatusPill'
 
 const navItems = [
   { to: '/',        label: 'Library',       icon: Film,     end: true  },
+  { to: '/sources', label: 'Sources',       icon: Rss,      end: false },
   { to: '/smart-query', label: 'Smart Query', icon: Search,  end: false },
   { to: '/clips',   label: 'Clips',         icon: Scissors, end: false },
   { to: '/quick',   label: 'Quick',         icon: Bolt,     end: false },

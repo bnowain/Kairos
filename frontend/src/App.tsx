@@ -11,6 +11,7 @@ import StoryPage from './pages/StoryPage'
 import TimelinePage from './pages/TimelinePage'
 import RenderPage from './pages/RenderPage'
 import CaptionsPage from './pages/CaptionsPage'
+import SourcesPage from './pages/SourcesPage'
 import SettingsPage from './pages/SettingsPage'
 
 const queryClient = new QueryClient({
@@ -30,6 +31,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LibraryPage />} />
             <Route path="/item/:item_id" element={<ItemPage />} />
+            <Route path="/sources" element={<SourcesPage />} />
             <Route path="/clips" element={<ClipsPage />} />
             <Route path="/quick" element={<QuickJobPage />} />
             <Route path="/jobs" element={<JobHistoryPage />} />

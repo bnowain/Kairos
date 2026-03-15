@@ -164,6 +164,19 @@ export interface CaptionStyle {
   created_at: string
 }
 
+export interface AcquisitionSource {
+  source_id: string
+  source_type: string
+  source_url: string
+  source_name: string | null
+  platform: string
+  schedule_cron: string | null
+  last_polled_at: string | null
+  enabled: number
+  download_quality: string | null
+  created_at: string
+}
+
 export interface HealthStatus {
   status: string
   version: string

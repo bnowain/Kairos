@@ -12,6 +12,7 @@ import { useMediaItem } from '../hooks/useLibrary'
 import { useSegments, useStartTranscription, useTranscriptionJobs } from '../hooks/useTranscription'
 import { useHighlights, useStartAnalysis } from '../hooks/useAnalysis'
 import { useClips, useGenerateClips } from '../hooks/useClips'
+import { CreateClipDialog } from '../components/Analysis/CreateClipDialog'
 import { apiUrl } from '../api/client'
 import { formatDate, formatDurationSeconds } from '../utils/format'
 import { useState, useEffect } from 'react'
@@ -74,8 +75,10 @@ export default function ItemPage() {
 
   const thumbFilename = item.thumb_path?.split('/').pop()
 
-  function handleCreateClip(_highlight: AnalysisHighlight) {
-    // Future: open a dialog to create a clip from this highlight
+  const [clipDialogHighlight, setClipDialogHighlight] = useState<AnalysisHighlight | null>(null)
+
+  function handleCreateClip(highlight: AnalysisHighlight) {
+    setClipDialogHighlight(highlight)
   }
 
   const tabs = [
@@ -288,6 +291,13 @@ export default function ItemPage() {
           className="h-full"
         />
       </div>
+
+      <CreateClipDialog
+        open={!!clipDialogHighlight}
+        onOpenChange={(open) => { if (!open) setClipDialogHighlight(null) }}
+        itemId={item_id ?? ''}
+        highlight={clipDialogHighlight}
+      />
     </div>
   )
 }

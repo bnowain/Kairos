@@ -11,6 +11,9 @@ import type { Clip } from '../../api/types'
 
 interface ClipCardProps {
   clip: Clip
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelect?: (clipId: string) => void
 }
 
 const statusVariant: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
@@ -20,7 +23,7 @@ const statusVariant: Record<string, 'default' | 'info' | 'warning' | 'success' |
   error: 'error',
 }
 
-export function ClipCard({ clip }: ClipCardProps) {
+export function ClipCard({ clip, selectable, selected, onToggleSelect }: ClipCardProps) {
   const { mutate: extract, isPending } = useExtractClip()
   const navigate = useNavigate()
   const [showPlayer, setShowPlayer] = useState(false)
@@ -63,6 +66,19 @@ export function ClipCard({ clip }: ClipCardProps) {
               </button>
             )}
           </>
+        )}
+        {selectable && (
+          <label
+            className="absolute top-1.5 left-1.5 z-10 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelect?.(clip.clip_id)}
+              className="h-4 w-4 accent-blue-500 rounded"
+            />
+          </label>
         )}
         <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white font-mono">
           {formatDuration(clip.duration_ms)}

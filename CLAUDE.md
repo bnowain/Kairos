@@ -33,6 +33,15 @@ It is a **standalone project** — not an Atlas spoke, no health endpoint regist
 | `kairos/routers/` | FastAPI route handlers |
 | `kairos/services/acquisition/` | Downloader, deduplicator, library organizer |
 | `kairos/services/ingest/` | Audio extractor, thumbnailer, ingest pipeline |
+| `kairos/services/transcription/` | faster-whisper, pyannote diarization, alignment |
+| `kairos/services/analysis/` | LLM analyzer, emotion/controversy/audio scoring |
+| `kairos/services/clip_engine/` | FFmpeg NVENC extraction, silence removal, batch |
+| `kairos/services/story_builder/` | Template loading, slot assignment, clip ranking, timeline assembly |
+| `kairos/services/caption_engine/` | Word-level captions, styling, burn-in, SRT/VTT/ASS export |
+| `kairos/services/aspect_ratio/` | MediaPipe face detection, reframing, tracking |
+| `kairos/services/renderer/` | FFmpeg builder, preview/final rendering, queue |
+| `kairos/services/smart_query/` | Intent scoring, data fetching, orchestration |
+| `frontend/` | React + Vite + TypeScript SPA |
 | `database/kairos.db` | Main SQLite database |
 | `database/huey_gpu.db` | GPU task queue |
 | `database/huey_light.db` | I/O task queue |
@@ -75,10 +84,21 @@ huey_consumer kairos.worker.huey_light -w 2 -k thread
 
 ## Phase Status
 
-- **Phase 1** (current): Acquisition + ingest pipeline. Download videos, organize library,
-  extract audio, generate thumbnails. No transcription yet.
-- **Phase 2** (next): Whisper transcription + diarization + segment analysis.
-- **Phase 3**: Clip extraction + Story Builder + Timeline rendering.
+- **Phase 1** (done): Acquisition + ingest pipeline. Download videos, organize library,
+  extract audio, generate thumbnails.
+- **Phase 2** (done): Whisper transcription + diarization + segment analysis.
+- **Phase 3** (done): Clip extraction + Story Builder + Timeline rendering.
+
+All three phases are fully implemented — backend services, API routers, and frontend UI.
+
+### Frontend Milestones (all complete)
+
+- **M1**: Library browser, item detail page, upload, Quick Job
+- **M2**: Camera roll upload, mobile card layout, responsive ItemPage
+- **M3**: Job history, download/share, retry, cancel + Mission Control LLM routing
+- **M4**: Synced video player, clip builder, enhanced clip library
+- **M5**: Story Builder UI, drag-and-drop timeline, clip preview, caption editor, render progress
+- **M6**: Source management page, create clip from highlight, clip sorting + bulk delete, mobile nav reorganization
 
 ## Architecture Reference
 
