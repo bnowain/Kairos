@@ -1,6 +1,23 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { ElementRow } from './ElementRow'
+import { TimelineStrip } from './TimelineStrip'
 import { Button } from '../ui/Button'
 import { formatDuration } from '../../utils/format'
 import {
@@ -14,23 +31,30 @@ import type { Timeline, TimelineElement } from '../../api/types'
 
 interface TimelineEditorProps {
   timeline: Timeline
+  selectedElementId?: string | null
+  onSelectElement?: (id: string) => void
 }
 
-export function TimelineEditor({ timeline }: TimelineEditorProps) {
+export function TimelineEditor({ timeline, selectedElementId, onSelectElement }: TimelineEditorProps) {
   const qc = useQueryClient()
   const [elements, setElements] = useState<TimelineElement[]>(timeline.elements)
 
   const totalDurationMs = elements.reduce((sum, el) => sum + el.duration_ms, 0)
 
-  async function moveElement(elementId: string, direction: 'up' | 'down') {
-    const idx = elements.findIndex((e) => e.element_id === elementId)
-    if (idx < 0) return
-    const newElements = [...elements]
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= newElements.length) return
-    const temp = newElements[idx]!
-    newElements[idx] = newElements[swapIdx]!
-    newElements[swapIdx] = temp
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = elements.findIndex((e) => e.element_id === active.id)
+    const newIndex = elements.findIndex((e) => e.element_id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+
+    const newElements = arrayMove(elements, oldIndex, newIndex)
     setElements(newElements)
     await reorderElements(
       timeline.timeline_id,
@@ -70,20 +94,38 @@ export function TimelineEditor({ timeline }: TimelineEditorProps) {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {elements.map((el, i) => (
-          <ElementRow
-            key={el.element_id}
-            element={el}
-            index={i}
-            total={elements.length}
-            onMoveUp={(id) => void moveElement(id, 'up')}
-            onMoveDown={(id) => void moveElement(id, 'down')}
-            onDelete={(id) => void handleDelete(id)}
-            onUpdate={(id, params) => void handleUpdate(id, params)}
-          />
-        ))}
-      </div>
+      <TimelineStrip
+        elements={elements}
+        selectedId={selectedElementId ?? null}
+        onSelect={(id) => onSelectElement?.(id)}
+      />
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis]}
+        onDragEnd={(e) => void handleDragEnd(e)}
+      >
+        <SortableContext
+          items={elements.map((e) => e.element_id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-2">
+            {elements.map((el, i) => (
+              <ElementRow
+                key={el.element_id}
+                element={el}
+                index={i}
+                total={elements.length}
+                selected={el.element_id === selectedElementId}
+                onSelect={(id) => onSelectElement?.(id)}
+                onDelete={(id) => void handleDelete(id)}
+                onUpdate={(id, params) => void handleUpdate(id, params)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {elements.length === 0 && (
         <div className="flex items-center justify-center h-24 text-gray-500 text-sm">

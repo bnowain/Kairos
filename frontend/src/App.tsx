@@ -10,6 +10,7 @@ import SmartQueryPage from './pages/SmartQueryPage'
 import StoryPage from './pages/StoryPage'
 import TimelinePage from './pages/TimelinePage'
 import RenderPage from './pages/RenderPage'
+import CaptionsPage from './pages/CaptionsPage'
 import SettingsPage from './pages/SettingsPage'
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/stories" element={<StoryPage />} />
             <Route path="/timeline/:timeline_id" element={<TimelinePage />} />
             <Route path="/render" element={<RenderPage />} />
+            <Route path="/captions" element={<CaptionsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </AppShell>

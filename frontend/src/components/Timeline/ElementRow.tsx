@@ -1,16 +1,19 @@
-import { Film, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Film, Trash2, GripVertical } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '../ui/Button'
 import { TransitionPicker } from './TransitionPicker'
 import { Input } from '../ui/Input'
 import { formatDuration } from '../../utils/format'
+import { cn } from '../../utils/cn'
 import type { TimelineElement } from '../../api/types'
 
 interface ElementRowProps {
   element: TimelineElement
   index: number
   total: number
-  onMoveUp: (elementId: string) => void
-  onMoveDown: (elementId: string) => void
+  selected?: boolean
+  onSelect?: (elementId: string) => void
   onDelete: (elementId: string) => void
   onUpdate: (elementId: string, params: Partial<TimelineElement>) => void
 }
@@ -18,39 +21,48 @@ interface ElementRowProps {
 export function ElementRow({
   element,
   index,
-  total,
-  onMoveUp,
-  onMoveDown,
+  selected,
+  onSelect,
   onDelete,
   onUpdate,
 }: ElementRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: element.element_id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
   const params = element.element_params
     ? (JSON.parse(element.element_params) as Record<string, string>)
     : {}
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-gray-900 border border-gray-800 px-3 py-2.5">
-      {/* Position */}
-      <div className="flex flex-col gap-0.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          disabled={index === 0}
-          onClick={() => onMoveUp(element.element_id)}
-        >
-          <ChevronUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          disabled={index === total - 1}
-          onClick={() => onMoveDown(element.element_id)}
-        >
-          <ChevronDown className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-3 rounded-lg bg-gray-900 border px-3 py-2.5',
+        selected ? 'border-blue-500' : 'border-gray-800',
+        isDragging && 'opacity-50 z-10',
+      )}
+      onClick={() => onSelect?.(element.element_id)}
+    >
+      {/* Drag handle */}
+      <button
+        className="shrink-0 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 touch-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
 
       <span className="text-xs text-gray-600 w-6 text-center shrink-0">{index + 1}</span>
 
@@ -90,6 +102,7 @@ export function ElementRow({
                 element_params: JSON.stringify({ ...params, text: e.target.value }),
               })
             }
+            onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="text-sm text-gray-300 capitalize">
@@ -106,7 +119,10 @@ export function ElementRow({
         variant="ghost"
         size="sm"
         className="shrink-0 text-red-500 hover:text-red-400 hover:bg-red-900/20"
-        onClick={() => onDelete(element.element_id)}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete(element.element_id)
+        }}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

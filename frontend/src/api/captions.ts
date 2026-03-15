@@ -18,6 +18,16 @@ export function createCaptionStyle(
   })
 }
 
+export function updateCaptionStyle(
+  styleId: string,
+  updates: Partial<Omit<CaptionStyle, 'style_id' | 'created_at'>>,
+): Promise<CaptionStyle> {
+  return apiFetch<CaptionStyle>(`/api/captions/styles/${styleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  })
+}
+
 export function deleteCaptionStyle(styleId: string): Promise<{ status: string }> {
   return apiFetch(`/api/captions/styles/${styleId}`, { method: 'DELETE' })
 }

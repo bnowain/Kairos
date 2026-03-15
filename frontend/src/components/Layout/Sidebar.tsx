@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search } from 'lucide-react'
+import { Film, Scissors, Bolt, Zap, Video, Settings, ClipboardList, Search, Type } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { MCStatusPill } from './MCStatusPill'
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/jobs',    label: 'Jobs',          icon: ClipboardList, end: false },
   { to: '/stories', label: 'Story Builder', icon: Zap,      end: false },
   { to: '/render',  label: 'Render Queue',  icon: Video,    end: false },
+  { to: '/captions',label: 'Captions',      icon: Type,     end: false },
   { to: '/settings',label: 'Settings',      icon: Settings, end: false },
 ]
 

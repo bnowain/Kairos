@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchRenderJobs, createRenderJob, retryRenderJob } from '../api/render'
+import { fetchRenderJobs, fetchRenderJob, createRenderJob, retryRenderJob } from '../api/render'
 import type { CreateRenderParams } from '../api/render'
 
 export function useRenderJobs() {
@@ -21,6 +21,19 @@ export function useCreateRenderJob() {
     mutationFn: (params: CreateRenderParams) => createRenderJob(params),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['render-jobs'] })
+    },
+  })
+}
+
+export function useRenderJob(renderId: string) {
+  return useQuery({
+    queryKey: ['render-job', renderId],
+    queryFn: () => fetchRenderJob(renderId),
+    enabled: !!renderId,
+    refetchInterval: (query) => {
+      const job = query.state.data
+      if (!job) return false
+      return job.render_status === 'running' ? 2000 : false
     },
   })
 }
