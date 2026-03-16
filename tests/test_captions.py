@@ -142,3 +142,42 @@ def test_presets_have_expected_keys(client):
         assert "font_size" in preset
         assert "font_color" in preset
         assert "position" in preset
+
+
+def test_get_single_style_by_id(client):
+    """GET /api/captions/styles/{style_id} returns correct style."""
+    r = client.post("/api/captions/styles", json={
+        "style_name": "Single Style Fetch Test Unique 010",
+        "font_name": "Helvetica",
+        "font_size": 56,
+        "font_color": "#FF0000",
+        "outline_color": "#000000",
+        "outline_width": 2,
+        "shadow": 1,
+        "position": "top",
+    })
+    assert r.status_code in (200, 201)
+    sid = r.json()["style_id"]
+
+    r = client.get(f"/api/captions/styles/{sid}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["style_name"] == "Single Style Fetch Test Unique 010"
+    assert data["font_name"] == "Helvetica"
+    assert data["position"] == "top"
+
+
+def test_get_style_not_found_returns_404(client):
+    r = client.get("/api/captions/styles/does-not-exist-style-id")
+    assert r.status_code == 404
+
+
+def test_presets_structure_complete(client):
+    """Each preset should have outline_color and outline_width."""
+    r = client.get("/api/captions/presets")
+    assert r.status_code == 200
+    data = r.json()
+    for platform in ("tiktok", "youtube", "instagram"):
+        preset = data[platform]
+        assert "outline_color" in preset
+        assert "outline_width" in preset

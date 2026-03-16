@@ -4,6 +4,7 @@ Uses FastAPI TestClient with an isolated SQLite database.
 """
 import os
 import tempfile
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -25,6 +26,7 @@ def client(tmp_dir):
 
     # Patch config before app import
     import kairos.config as cfg
+    cfg.BASE_DIR = type(cfg.BASE_DIR)(tmp_dir)
     cfg.DATABASE_PATH = type(cfg.DATABASE_PATH)(db_path)
     cfg.DATABASE_URL = f"sqlite:///{db_path}"
     cfg.MEDIA_LIBRARY_ROOT = type(cfg.MEDIA_LIBRARY_ROOT)(tmp_dir + "/media_library")
@@ -189,3 +191,95 @@ def sample_timeline(client, sample_clip):
     timeline_id = tl.timeline_id
     db.close()
     return timeline_id
+
+
+@pytest.fixture
+def sample_smart_query(client, sample_item):
+    """Create a SmartQuery with one QueryCandidate and return (query_id, candidate_id)."""
+    import uuid
+    from kairos.database import SessionLocal
+    from kairos.models import SmartQuery, QueryCandidate
+    from datetime import datetime
+
+    db = SessionLocal()
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    q = SmartQuery(
+        query_id=str(uuid.uuid4()),
+        query_text="Find combative moments",
+        query_source="kairos",
+        query_status="done",
+        query_progress=100,
+        query_stage_label="Done",
+        query_result_count=1,
+        scorer_models='["default"]',
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(q)
+    db.commit()
+
+    cand = QueryCandidate(
+        candidate_id=str(uuid.uuid4()),
+        query_id=q.query_id,
+        candidate_origin="kairos",
+        candidate_item_id=sample_item,
+        candidate_text="This is a heated exchange about policy.",
+        candidate_start_ms=5000,
+        candidate_end_ms=20000,
+        candidate_speaker="SPEAKER_00",
+        candidate_video_title="Test Video",
+        intent_relevance_score=0.85,
+        intent_score_reason="High conflict language detected",
+        intent_scorer_model="default",
+        created_at=now,
+    )
+    db.add(cand)
+    db.commit()
+    query_id = q.query_id
+    candidate_id = cand.candidate_id
+    db.close()
+    return query_id, candidate_id
+
+
+@pytest.fixture
+def sample_quick_job(client):
+    """Create a QuickJob with error status and return its job_id."""
+    import uuid
+    import json
+    from kairos.database import SessionLocal
+    from kairos.models import QuickJob
+    from datetime import datetime
+
+    db = SessionLocal()
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    job = QuickJob(
+        job_id=str(uuid.uuid4()),
+        urls=json.dumps(["https://youtube.com/watch?v=test123"]),
+        template_id="viral_reel",
+        aspect_ratio="9:16",
+        job_status="error",
+        stage_label="Download failed",
+        progress=10,
+        error_msg="Network timeout",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(job)
+    db.commit()
+    job_id = job.job_id
+    db.close()
+    return job_id
+
+
+@pytest.fixture
+def sample_source(client):
+    """Create an AcquisitionSource via API and return its source_id."""
+    r = client.post("/api/acquisition/sources", json={
+        "source_type": "youtube_channel",
+        "source_url": f"https://youtube.com/@fixture_{uuid.uuid4().hex[:8]}",
+        "source_name": "Fixture Channel",
+        "platform": "youtube",
+        "enabled": 1,
+    })
+    assert r.status_code in (200, 201)
+    return r.json()["source_id"]

@@ -195,3 +195,58 @@ def test_list_clips_filter_source(client, sample_clip):
     assert r.status_code == 200
     clips = r.json()
     assert all(c["clip_source"] == "ai" for c in clips)
+
+
+def test_list_clips_pagination(client, sample_clip):
+    """Clips list respects limit parameter."""
+    r = client.get("/api/clips?limit=1")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert len(data) <= 1
+
+
+def test_reextract_clip(client, sample_clip):
+    """Re-extracting a ready clip should return queued status."""
+    r = client.post(f"/api/clips/{sample_clip}/extract")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "queued"
+    assert data["clip_id"] == sample_clip
+
+
+def test_download_clip_not_ready(client, sample_item):
+    """Downloading a clip that's not ready should return 404."""
+    import uuid
+    from kairos.database import SessionLocal
+    from kairos.models import Clip
+    from datetime import datetime
+
+    db = SessionLocal()
+    clip = Clip(
+        clip_id=str(uuid.uuid4()),
+        item_id=sample_item,
+        start_ms=0,
+        end_ms=5000,
+        duration_ms=5000,
+        clip_status="pending",
+        clip_source="ai",
+        created_at=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        updated_at=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+    )
+    db.add(clip)
+    db.commit()
+    clip_id = clip.clip_id
+    db.close()
+
+    r = client.get(f"/api/clips/{clip_id}/download")
+    assert r.status_code == 404
+
+
+def test_list_clips_filter_min_score(client, sample_clip):
+    """Filter clips by minimum virality score."""
+    r = client.get("/api/clips?min_score=0.5")
+    assert r.status_code == 200
+    clips = r.json()
+    # sample_clip has virality_score=0.75
+    assert all(c.get("virality_score", 0) >= 0.5 for c in clips if c.get("virality_score") is not None)

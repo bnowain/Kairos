@@ -69,3 +69,53 @@ def test_list_library_pagination(client):
     assert r.status_code == 200
     assert isinstance(r.json(), list)
     assert len(r.json()) <= 1
+
+
+def test_list_library_pagination_offset(client, sample_item):
+    """Offset beyond available items returns empty list."""
+    r = client.get("/api/library?limit=10&offset=9999")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_item_detail_has_transcription_fields(client, sample_item):
+    """Detail endpoint should include transcription_job_status, segment_count, clip_count."""
+    r = client.get(f"/api/library/{sample_item}")
+    assert r.status_code == 200
+    data = r.json()
+    assert "transcription_job_status" in data
+    assert "segment_count" in data
+    assert "clip_count" in data
+
+
+def test_item_detail_clip_count(client, sample_clip, sample_item):
+    """Item with a clip should report clip_count >= 1."""
+    r = client.get(f"/api/library/{sample_item}")
+    assert r.status_code == 200
+    assert r.json()["clip_count"] >= 1
+
+
+def test_stream_no_file_path(client, sample_item):
+    """Stream endpoint returns 404 when item has no file_path."""
+    r = client.get(f"/api/library/{sample_item}/stream")
+    assert r.status_code == 404
+
+
+def test_thumbnail_no_thumb_path(client, sample_item):
+    """Thumbnail endpoint returns 404 when item has no thumb_path."""
+    r = client.get(f"/api/library/{sample_item}/thumb")
+    assert r.status_code == 404
+
+
+def test_list_library_filter_platform_no_match(client):
+    """Filtering by non-existent platform returns empty list."""
+    r = client.get("/api/library?platform=nonexistent_platform")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_list_library_filter_status_no_match(client):
+    """Filtering by status with no matches returns empty list."""
+    r = client.get("/api/library?status=nonexistent_status")
+    assert r.status_code == 200
+    assert r.json() == []

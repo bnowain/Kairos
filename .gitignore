@@ -49,3 +49,13 @@ htmlcov/
 # Frontend build artifacts (keep source, ignore dist)
 frontend/dist/
 frontend/node_modules/
+frontend/test-results/
+
+# Tor bundle (local binary, not committed)
+tor-bundle/
+
+# Downloads (MMI debug/history)
+downloads/
+
+# Media root (catch-all for any media/ files not covered above)
+media/

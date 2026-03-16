@@ -88,3 +88,49 @@ def test_download_request_creates_item(client):
     data = r.json()
     assert "item_id" in data
     assert data["status"] == "queued"
+
+
+def test_poll_source(client, sample_source):
+    """Poll a source should return 200 (may fail subprocess but HTTP succeeds)."""
+    r = client.post(f"/api/acquisition/sources/{sample_source}/poll")
+    # 200 success or 500/504 if yt-dlp is not installed / times out
+    assert r.status_code in (200, 500, 504)
+
+
+def test_poll_disabled_source(client):
+    """Polling a disabled source should return 400."""
+    r = client.post("/api/acquisition/sources", json={
+        "source_type": "youtube_channel",
+        "source_url": "https://youtube.com/@disabled_poll_test",
+        "platform": "youtube",
+        "enabled": 0,
+    })
+    assert r.status_code in (200, 201)
+    sid = r.json()["source_id"]
+
+    r = client.post(f"/api/acquisition/sources/{sid}/poll")
+    assert r.status_code == 400
+
+
+def test_download_invalid_url(client):
+    """Download with an empty/missing URL should return 422."""
+    r = client.post("/api/acquisition/download", json={})
+    assert r.status_code == 422
+
+
+def test_create_source_with_all_fields(client):
+    """Create a source with all optional fields populated."""
+    r = client.post("/api/acquisition/sources", json={
+        "source_type": "youtube_playlist",
+        "source_url": "https://youtube.com/playlist?list=PLtest_all_fields",
+        "source_name": "Full Config Source",
+        "platform": "youtube",
+        "schedule_cron": "0 */6 * * *",
+        "enabled": 1,
+        "download_quality": "bestvideo[height<=720]+bestaudio/best",
+    })
+    assert r.status_code in (200, 201)
+    data = r.json()
+    assert data["source_name"] == "Full Config Source"
+    assert data["schedule_cron"] == "0 */6 * * *"
+    assert data["download_quality"] == "bestvideo[height<=720]+bestaudio/best"

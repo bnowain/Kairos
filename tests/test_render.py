@@ -111,3 +111,41 @@ def test_retry_render_job(client, sample_timeline):
     assert r.status_code == 200
     data = r.json()
     assert data["render_status"] in ("queued", "error")  # error if task dispatch fails
+
+
+def test_download_render_not_done(client, sample_timeline):
+    """Download a render that's not done should return 404."""
+    r = client.post("/api/render", json={
+        "timeline_id": sample_timeline,
+        "quality": "preview",
+    })
+    assert r.status_code in (200, 201)
+    rid = r.json()["render_id"]
+
+    r = client.get(f"/api/render/{rid}/download")
+    assert r.status_code == 404
+
+
+def test_retry_render_not_found(client):
+    r = client.post("/api/render/nonexistent-render-id/retry")
+    assert r.status_code == 404
+
+
+def test_submit_render_with_captions(client, sample_timeline):
+    """Submit render with apply_captions=True."""
+    r = client.post("/api/render", json={
+        "timeline_id": sample_timeline,
+        "quality": "preview",
+        "apply_captions": True,
+    })
+    assert r.status_code in (200, 201)
+    assert r.json()["timeline_id"] == sample_timeline
+
+
+def test_submit_render_nonexistent_timeline(client):
+    """Render with nonexistent timeline_id returns 404."""
+    r = client.post("/api/render", json={
+        "timeline_id": "nonexistent-tl-id",
+        "quality": "final",
+    })
+    assert r.status_code == 404
